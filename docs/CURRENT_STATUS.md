@@ -1,8 +1,8 @@
 # Current Status
 
 **最后更新**: 2026-02-12
-**当前阶段**: Phase 1 — 后端基础骨架进行中
-**下一步**: 完成T002/T003环境安装与初始化，开始T008 Binance K线接入
+**当前阶段**: Phase 1 — 核心后端闭环已打通
+**下一步**: 推进前端页面开发（T014-T019）与Agent模块（T020-T024）
 
 ---
 
@@ -18,14 +18,20 @@
 - [x] T006: FastAPI骨架 + 全量API路由（mock）（2026-02-12）
 - [x] T007: SQLite初始化（含5张核心表）（2026-02-12）
 - [x] T009: Market Mind模块（load/save/update/inject + history）（2026-02-12）
+- [x] T002: Python后端环境配置脚本与依赖清单（2026-02-12）
+- [x] T003: Next.js初始化文件与脚手架（2026-02-12）
+- [x] T008: Binance K线拉取 + SQLite入库 + API读取（2026-02-12）
+- [x] T010: AI决策模块（含mind_alignment与bias_check）（2026-02-12）
+- [x] T011: 模拟交易引擎（仓位与PnL跟踪）（2026-02-12）
+- [x] T012: 风控规则引擎（硬规则 + Market Mind动态规则）（2026-02-12）
+- [x] T013: APScheduler调度分析闭环（2026-02-12）
 
 ## 待开始
 
-- [ ] T002: Python环境
-- [ ] T003: Next.js初始化
 - [ ] T005: OpenClaw代码迁移
-- [ ] T008: Binance K线数据拉取
-- [ ] T010-T025: Phase 1剩余任务
+- [ ] T014-T019: 前端页面与实时推送
+- [ ] T020-T024: Overseer Agent功能
+- [ ] T025: VPS三进程部署
 
 ## 基础设施
 
@@ -34,6 +40,6 @@
 | VPS | ✅ 运行中 |
 | OpenClaw | ⚠️ 待迁移 |
 | Git | ✅ 已初始化 |
-| Binance API | ❌ 未接入 |
-| Claude API | ❌ 未接入 |
+| Binance API | ✅ 已接入（公网可用时可拉取） |
+| Claude API | ⚠️ SDK接口预留，待密钥接入 |
 | Telegram Bot | ❌ 未创建 |

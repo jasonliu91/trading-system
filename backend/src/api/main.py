@@ -12,15 +12,24 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.src.config import settings
-from backend.src.db.database import get_db
+from backend.src.data.binance_client import BinanceAPIError
+from backend.src.data.kline_service import (
+    fallback_mock_klines,
+    fetch_and_store_klines,
+    get_recent_klines,
+    latest_price_from_db,
+)
+from backend.src.db.database import SessionLocal, get_db
 from backend.src.db.init_db import init_db
-from backend.src.db.models import Decision, MarketMindHistory
+from backend.src.db.models import Decision, MarketMindHistory, Trade
 from backend.src.mind.market_mind import (
     inject_to_prompt,
     load as load_market_mind,
     save as save_market_mind,
     update as update_market_mind,
 )
+from backend.src.orchestrator.service import run_analysis_cycle, scheduler_status, start_scheduler, stop_scheduler
+from backend.src.trading.paper_engine import get_portfolio_snapshot
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
 
@@ -45,37 +54,12 @@ class ConfigUpdateRequest(BaseModel):
     max_position_pct: float | None = None
     max_exposure_pct: float | None = None
     max_daily_loss_pct: float | None = None
-
-
-def _mock_klines(timeframe: str, limit: int) -> list[dict[str, Any]]:
-    now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
-    step = {"1h": timedelta(hours=1), "4h": timedelta(hours=4), "1d": timedelta(days=1)}.get(timeframe, timedelta(hours=1))
-    klines = []
-    base_price = 3200.0
-    for index in range(limit):
-        open_time = now - step * (limit - index)
-        open_price = base_price + index * 2.0
-        close_price = open_price + ((index % 3) - 1) * 3.0
-        high_price = max(open_price, close_price) + 4.0
-        low_price = min(open_price, close_price) - 4.0
-        klines.append(
-            {
-                "symbol": "ETHUSDT",
-                "timeframe": timeframe,
-                "open_time": open_time.isoformat(),
-                "open": round(open_price, 2),
-                "high": round(high_price, 2),
-                "low": round(low_price, 2),
-                "close": round(close_price, 2),
-                "volume": round(1500 + index * 12.5, 2),
-            }
-        )
-    return klines
+    scheduler_enabled: bool | None = None
 
 
 def _serialize_decision(row: Decision) -> dict[str, Any]:
     try:
-        reasoning = json.loads(row.reasoning_json)
+        reasoning = json.loads(row.reasoning_json) if row.reasoning_json else {}
     except json.JSONDecodeError:
         reasoning = {"raw": row.reasoning_json}
     return {
@@ -93,47 +77,66 @@ def _serialize_decision(row: Decision) -> dict[str, Any]:
     }
 
 
+def _latest_decision(db: Session) -> Decision | None:
+    return db.execute(select(Decision).order_by(Decision.timestamp.desc(), Decision.id.desc()).limit(1)).scalars().first()
+
+
 @app.on_event("startup")
 def on_startup() -> None:
     init_db()
     load_market_mind()
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+def on_shutdown() -> None:
+    stop_scheduler()
 
 
 @app.get("/api/system/health")
-def health_check() -> dict[str, str]:
-    return {"status": "ok", "service": settings.app_name}
+def health_check() -> dict[str, Any]:
+    return {"status": "ok", "service": settings.app_name, "scheduler": scheduler_status()}
 
 
 @app.get("/api/klines")
 def get_klines(
     timeframe: str = Query(default="1d"),
     limit: int = Query(default=90, ge=1, le=500),
+    refresh: bool = Query(default=False),
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     if timeframe not in {"1h", "4h", "1d"}:
         raise HTTPException(status_code=400, detail="timeframe must be one of: 1h, 4h, 1d")
-    return {"items": _mock_klines(timeframe=timeframe, limit=limit)}
+
+    refresh_result: dict[str, Any] = {"requested": refresh}
+    if refresh:
+        try:
+            count = fetch_and_store_klines(
+                db=db,
+                symbol=settings.trading_pair,
+                timeframe=timeframe,
+                limit=max(limit, 60),
+            )
+            refresh_result["stored"] = count
+        except BinanceAPIError as exc:
+            refresh_result["error"] = str(exc)
+
+    items = get_recent_klines(db=db, symbol=settings.trading_pair, timeframe=timeframe, limit=limit)
+    source = "database"
+    if not items:
+        items = fallback_mock_klines(timeframe=timeframe, limit=limit, symbol=settings.trading_pair)
+        source = "mock_fallback"
+
+    return {"items": items, "source": source, "refresh": refresh_result}
 
 
 @app.get("/api/portfolio")
-def get_portfolio() -> dict[str, Any]:
-    return {
-        "balance": 10000.0,
-        "equity": 10180.5,
-        "available": 8120.2,
-        "exposure_pct": 18.9,
-        "positions": [
-            {
-                "symbol": "ETHUSDT",
-                "side": "long",
-                "quantity": 0.45,
-                "entry_price": 3188.0,
-                "mark_price": 3225.0,
-                "unrealized_pnl": 16.65,
-                "stop_loss": 3075.0,
-                "take_profit": 3390.0,
-            }
-        ],
-    }
+def get_portfolio(db: Session = Depends(get_db)) -> dict[str, Any]:
+    mark_price = latest_price_from_db(db=db, symbol=settings.trading_pair) or 0.0
+    snapshot = get_portfolio_snapshot(db=db, symbol=settings.trading_pair, mark_price=mark_price)
+    snapshot["symbol"] = settings.trading_pair
+    snapshot["mark_price"] = round(mark_price, 2)
+    return snapshot
 
 
 @app.get("/api/decisions")
@@ -143,68 +146,47 @@ def get_decisions(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     offset = (page - 1) * limit
-    rows = db.execute(select(Decision).order_by(Decision.timestamp.desc()).offset(offset).limit(limit)).scalars().all()
-    if rows:
-        return {"items": [_serialize_decision(row) for row in rows], "page": page, "limit": limit}
-    mock_item = {
-        "id": 1,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "decision": "hold",
-        "position_size_pct": 0.0,
-        "entry_price": 0.0,
-        "stop_loss": 0.0,
-        "take_profit": 0.0,
-        "confidence": 0.62,
-        "reasoning": {
-            "mind_alignment": "当前偏震荡，等待突破后再行动",
-            "bias_check": "检查了过度乐观偏误，未触发开仓条件",
-        },
-        "model_used": "claude-sonnet-4-5-20250929",
-        "input_hash": "mock-input-hash",
-    }
-    return {"items": [mock_item], "page": page, "limit": limit}
+    rows = db.execute(select(Decision).order_by(Decision.timestamp.desc(), Decision.id.desc()).offset(offset).limit(limit)).scalars().all()
+    return {"items": [_serialize_decision(row) for row in rows], "page": page, "limit": limit}
 
 
 @app.get("/api/decisions/{decision_id}")
 def get_decision_detail(decision_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
     row = db.get(Decision, decision_id)
-    if row is not None:
-        return _serialize_decision(row)
-    if decision_id == 1:
-        return {
-            "id": 1,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "decision": "hold",
-            "position_size_pct": 0.0,
-            "entry_price": 0.0,
-            "stop_loss": 0.0,
-            "take_profit": 0.0,
-            "confidence": 0.62,
-            "reasoning": {
-                "market_regime": "ranging",
-                "mind_alignment": "符合Market Mind中震荡期降低频繁交易的偏好",
-                "bias_check": "检查偏误: 大跌抄底倾向，本次未逆势操作",
-                "final_logic": "趋势不明确，继续等待",
-            },
-            "model_used": "claude-sonnet-4-5-20250929",
-            "input_hash": "mock-input-hash",
-        }
-    raise HTTPException(status_code=404, detail="Decision not found")
+    if row is None:
+        raise HTTPException(status_code=404, detail="Decision not found")
+    return _serialize_decision(row)
 
 
 @app.get("/api/performance")
-def get_performance() -> dict[str, Any]:
+def get_performance(db: Session = Depends(get_db)) -> dict[str, Any]:
+    mark_price = latest_price_from_db(db=db, symbol=settings.trading_pair) or 0.0
+    portfolio = get_portfolio_snapshot(db=db, symbol=settings.trading_pair, mark_price=mark_price)
+    sells = db.execute(select(Trade).where(Trade.symbol == settings.trading_pair, Trade.side == "sell")).scalars().all()
+    win_count = sum(1 for row in sells if float(row.pnl or 0.0) > 0)
+    win_rate = (win_count / len(sells)) if sells else 0.0
+
+    total_return_pct = (
+        (float(portfolio["equity"]) - settings.initial_balance) / settings.initial_balance * 100
+        if settings.initial_balance > 0
+        else 0.0
+    )
+
+    equity_curve = [
+        {
+            "date": (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat(),
+            "equity": round(settings.initial_balance, 2),
+        },
+        {"date": datetime.now(timezone.utc).date().isoformat(), "equity": round(float(portfolio["equity"]), 2)},
+    ]
+
     return {
-        "equity_curve": [
-            {"date": "2025-02-10", "equity": 10000.0},
-            {"date": "2025-02-11", "equity": 10088.3},
-            {"date": "2025-02-12", "equity": 10180.5},
-        ],
+        "equity_curve": equity_curve,
         "metrics": {
-            "total_return_pct": 1.8,
-            "max_drawdown_pct": -0.9,
-            "win_rate": 0.56,
-            "profit_factor": 1.22,
+            "total_return_pct": round(total_return_pct, 2),
+            "max_drawdown_pct": 0.0,
+            "win_rate": round(win_rate, 4),
+            "profit_factor": 0.0,
         },
     }
 
@@ -213,9 +195,9 @@ def get_performance() -> dict[str, Any]:
 def get_signals() -> dict[str, Any]:
     return {
         "items": [
-            {"strategy_name": "ema_adx_daily", "signal": "buy", "strength": 0.71},
-            {"strategy_name": "supertrend_daily", "signal": "hold", "strength": 0.53},
-            {"strategy_name": "donchian_daily", "signal": "buy", "strength": 0.67},
+            {"strategy_name": "ema_adx_daily", "signal": "pending_phase2", "strength": 0.0},
+            {"strategy_name": "supertrend_daily", "signal": "pending_phase2", "strength": 0.0},
+            {"strategy_name": "donchian_daily", "signal": "pending_phase2", "strength": 0.0},
         ]
     }
 
@@ -268,51 +250,68 @@ def get_market_mind_history(limit: int = Query(default=20, ge=1, le=100), db: Se
 
 
 @app.get("/api/system/status")
-def get_system_status() -> dict[str, Any]:
+def get_system_status(db: Session = Depends(get_db)) -> dict[str, Any]:
+    latest = _latest_decision(db)
     return {
         "trading": "running",
-        "scheduler": "running",
+        "scheduler": scheduler_status(),
         "data_pipeline": "running",
         "agent": "not_configured",
         "analysis_interval_hours": settings.analysis_interval_hours,
+        "last_decision_at": latest.timestamp.isoformat() if latest and latest.timestamp else None,
     }
 
 
 @app.post("/api/system/trigger-analysis")
-def trigger_analysis() -> dict[str, str]:
-    return {"status": "accepted", "message": "Manual analysis trigger queued"}
+def trigger_analysis(db: Session = Depends(get_db)) -> dict[str, Any]:
+    result = run_analysis_cycle(db=db, source="manual_api")
+    return {"status": "completed", "result": result}
 
 
 @app.post("/api/system/pause")
-def pause_system() -> dict[str, str]:
-    return {"status": "ok", "message": "Trading paused (mock)"}
+def pause_system() -> dict[str, Any]:
+    return {"status": "ok", "scheduler": stop_scheduler(), "message": "Trading scheduler paused"}
 
 
 @app.post("/api/system/resume")
-def resume_system() -> dict[str, str]:
-    return {"status": "ok", "message": "Trading resumed (mock)"}
+def resume_system() -> dict[str, Any]:
+    return {"status": "ok", "scheduler": start_scheduler(), "message": "Trading scheduler resumed"}
 
 
 @app.post("/api/config/update")
 def update_config(payload: ConfigUpdateRequest) -> dict[str, Any]:
     applied = payload.model_dump(exclude_none=True) if hasattr(payload, "model_dump") else payload.dict(exclude_none=True)
-    return {"status": "accepted", "applied": applied}
+    return {
+        "status": "accepted",
+        "applied": applied,
+        "note": "Runtime env values are not mutated yet; persisted config update is pending Phase 1 system module.",
+    }
 
 
 @app.get("/api/summary/daily")
-def daily_summary() -> dict[str, Any]:
-    return {
-        "date": datetime.now(timezone.utc).date().isoformat(),
-        "summary": "今日策略以观望为主，等待关键阻力位突破。",
-    }
+def daily_summary(db: Session = Depends(get_db)) -> dict[str, Any]:
+    latest = _latest_decision(db)
+    if latest is None:
+        summary = "今日尚无决策。"
+    else:
+        summary = f"最新决策: {latest.decision}，置信度 {latest.confidence:.2f}。"
+    return {"date": datetime.now(timezone.utc).date().isoformat(), "summary": summary}
 
 
 @app.get("/api/summary/weekly")
-def weekly_summary() -> dict[str, Any]:
-    return {
-        "week_start": (datetime.now(timezone.utc).date() - timedelta(days=7)).isoformat(),
-        "summary": "本周回撤可控，趋势策略表现优于均值回归策略。",
-    }
+def weekly_summary(db: Session = Depends(get_db)) -> dict[str, Any]:
+    rows = (
+        db.execute(
+            select(Decision).where(Decision.timestamp >= datetime.now(timezone.utc) - timedelta(days=7)).order_by(Decision.timestamp.desc())
+        )
+        .scalars()
+        .all()
+    )
+    buys = sum(1 for row in rows if row.decision == "buy")
+    sells = sum(1 for row in rows if row.decision == "sell")
+    holds = sum(1 for row in rows if row.decision == "hold")
+    summary = f"近7天决策共{len(rows)}次，buy={buys}, sell={sells}, hold={holds}。"
+    return {"week_start": (datetime.now(timezone.utc).date() - timedelta(days=7)).isoformat(), "summary": summary}
 
 
 @app.websocket("/ws/live")
@@ -320,13 +319,22 @@ async def ws_live(websocket: WebSocket) -> None:
     await websocket.accept()
     try:
         while True:
-            payload = {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "symbol": "ETHUSDT",
-                "price": 3200.0,
-                "decision_hint": "hold",
-            }
+            db = SessionLocal()
+            try:
+                price = latest_price_from_db(db=db, symbol=settings.trading_pair) or 0.0
+                latest = _latest_decision(db)
+                payload = {
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "symbol": settings.trading_pair,
+                    "price": round(price, 2),
+                    "latest_decision": latest.decision if latest else None,
+                    "latest_decision_id": latest.id if latest else None,
+                }
+            finally:
+                db.close()
+
             await websocket.send_json(payload)
             await asyncio.sleep(2)
     except WebSocketDisconnect:
         return
+

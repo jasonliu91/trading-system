@@ -19,7 +19,7 @@ Market Mind是AI的认知状态文档——市场信念、策略偏好、经验�
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 系统架构（含Market Mind完整设计） |
 | [docs/PRD_PHASE1.md](docs/PRD_PHASE1.md) | Phase 1需求 |
 | [docs/TASK_QUEUE.md](docs/TASK_QUEUE.md) | 25个开发任务 |
-| [docs/DECISIONS.md](docs/DECISIONS.md) | 8个设计决策 |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | 10+ 设计决策 |
 | [docs/CURRENT_STATUS.md](docs/CURRENT_STATUS.md) | 当前进度 |
 | [docs/market_mind_init.json](docs/market_mind_init.json) | Market Mind初始模板 |
 
@@ -31,7 +31,8 @@ Claude Code → `CLAUDE.md` | OpenAI Codex → `AGENTS.md` | 其他 → 本文�
 
 ```bash
 # 后端
-cd backend && pip install -r requirements.txt && cp .env.example .env
+cd backend && ./scripts/setup_venv.sh
+source .venv/bin/activate
 uvicorn src.api.main:app --port 8000
 
 # 前端

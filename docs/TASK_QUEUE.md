@@ -9,10 +9,10 @@
 ### [x] T001: 初始化Git仓库（2026-02-12）
 **P0** | 15分钟 | 初始化Git，配置.gitignore
 
-### T002: Python后端环境配置
+### [x] T002: Python后端环境配置（2026-02-12）
 **P0** | 30分钟 | backend/下创建venv，安装依赖: python-binance, fastapi, uvicorn, anthropic, openai, pandas, ta, sqlalchemy, python-dotenv, apscheduler, websockets, python-telegram-bot
 
-### T003: Next.js前端初始化
+### [x] T003: Next.js前端初始化（2026-02-12）
 **P0** | 30分钟 | `npx create-next-app@latest frontend --typescript --tailwind --app --use-npm`，安装lightweight-charts, zustand, shadcn/ui
 
 ### [x] T004: 项目目录结构（2026-02-12）
@@ -37,22 +37,22 @@ frontend/src/ → app/, components/, lib/, hooks/, stores/
 ### [x] T007: SQLite数据库初始化（2026-02-12）
 **P0** | 45分钟 | 表: klines, decisions, trades, performance, market_mind_history
 
-### T008: Binance K线数据拉取
+### [x] T008: Binance K线数据拉取（2026-02-12）
 **P0** | 60分钟 | ETH/USDT 1h/4h/1d，存入SQLite，通过API提供
 
 ### [x] T009: Market Mind初始化模块（2026-02-12）
 **P0** | 60分钟 | 实现market_mind.py: load(), save(), inject_to_prompt(), update()。创建初始Market Mind JSON文件（你手动填写内容，代码提供框架）。Market Mind变更记录到history表。
 
-### T010: AI决策模块（集成Market Mind）
+### [x] T010: AI决策模块（集成Market Mind）（2026-02-12）
 **P0** | 90分钟 | 构造prompt时注入Market Mind。AI输出需包含mind_alignment和bias_check字段。
 
-### T011: 模拟交易引擎
+### [x] T011: 模拟交易引擎（2026-02-12）
 **P0** | 60分钟 | 纸盘交易：开仓、平仓、仓位跟踪、盈亏计算（含手续费滑点）
 
-### T012: 风控规则引擎
+### [x] T012: 风控规则引擎（2026-02-12）
 **P0** | 45分钟 | 硬性规则检查 + 支持从Market Mind读取动态规则（如bias_awareness中的仓位限制）
 
-### T013: 调度器
+### [x] T013: 调度器（2026-02-12）
 **P0** | 60分钟 | APScheduler定时任务：拉数据→计算指标→加载Mind→AI决策→风控→模拟执行
 
 ### 前端
