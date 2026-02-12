@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+sqlalchemy
+python-dotenv
+apscheduler
+python-binance
+anthropic
+openai
+pandas
+ta
+websockets
+python-telegram-bot
+

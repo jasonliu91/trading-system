@@ -1,0 +1,60 @@
+{
+  "version": "1.0",
+  "last_updated": null,
+  "updated_by": "manual_init",
+
+  "market_beliefs": {
+    "regime": "",
+    "regime_confidence": 0.5,
+    "narrative": "在此填写你对当前ETH市场阶段的判断。例如：牛市中期回调、熊市筑底、震荡蓄力等。这是AI做决策时最重要的宏观背景。",
+    "key_levels": {
+      "support": [],
+      "resistance": []
+    },
+    "macro_context": "在此填写你认为重要的宏观背景。例如：美联储政策方向、全球流动性环境、监管动态等。"
+  },
+
+  "strategy_weights": {
+    "trend_following": {
+      "weight": 0.5,
+      "reason": "初始默认值，待回测数据验证后调整"
+    },
+    "mean_reversion": {
+      "weight": 0.3,
+      "reason": "初始默认值"
+    },
+    "news_sentiment": {
+      "weight": 0.2,
+      "reason": "初始默认值，Phase 3接入新闻后调整"
+    }
+  },
+
+  "lessons_learned": [
+    {
+      "lesson": "日线策略显著优于小时线和4小时线策略",
+      "evidence": "大量回测验证：EMA+ADX, Donchian, Supertrend均在日线表现更好",
+      "added": "2025-02-13"
+    }
+  ],
+
+  "bias_awareness": [
+    {
+      "bias": "在此填写你已知的第一个投资偏误。例如：对ETH有长期看多倾向，可能忽视看空信号",
+      "mitigation": "在此填写对策。例如：看多决策需要至少2个独立信号确认"
+    },
+    {
+      "bias": "在此填写第二个偏误。例如：大跌时倾向于抄底",
+      "mitigation": "在此填写对策。例如：等趋势确认再入场，禁止在下跌趋势中逆势买入"
+    }
+  ],
+
+  "active_watchlist": [],
+
+  "user_inputs": [],
+
+  "performance_memory": {
+    "recent_accuracy": null,
+    "worst_pattern": null,
+    "best_pattern": null
+  }
+}
