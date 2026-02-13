@@ -4,6 +4,17 @@
 
 ---
 
+## D020: 本地联调采用脚本化三进程管理
+**日期**: 2026-02-12
+**决策**: 提供 `scripts/dev_start.sh`、`scripts/dev_stop.sh`、`scripts/dev_status.sh` 管理 backend/frontend/agent 本地进程
+**原因**:
+- 降低本地联调启动成本，避免手工开多个终端
+- 统一日志路径（`.run/*.log`）便于故障定位
+- Agent默认不启动，避免无Token时报错影响主流程
+**关键约束**:
+- 仅用于开发环境，不替代 VPS systemd 部署
+- `START_AGENT=true` 且配置有效时才启动 Agent
+
 ## D019: 部署脚本支持 dry-run 预演模式
 **日期**: 2026-02-12
 **决策**: `install_services.sh` 与 `full_deploy.sh` 增加 `DRY_RUN=true` 模式，仅打印关键命令不执行系统变更

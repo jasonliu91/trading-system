@@ -42,6 +42,15 @@ cd frontend && npm install && npm run dev
 cd backend && python -m src.agent.main
 ```
 
+## 本地三进程脚本
+
+```bash
+./scripts/dev_start.sh          # 启动 backend + frontend
+START_AGENT=true ./scripts/dev_start.sh
+./scripts/dev_status.sh
+./scripts/dev_stop.sh
+```
+
 ## 当前可用页面
 
 - `/` Dashboard（K线 + 持仓 + 最新决策 + WS实时价格）
