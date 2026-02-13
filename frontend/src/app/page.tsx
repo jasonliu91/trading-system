@@ -43,13 +43,26 @@ export default function HomePage() {
       </header>
 
       {error && (
-        <section className="rounded-2xl border border-bear/50 bg-bear/10 p-4 text-sm text-red-100">
-          API error: {error}. Confirm backend service is reachable at `NEXT_PUBLIC_API_BASE_URL`.
+        <section className="flex items-center justify-between rounded-2xl border border-bear/50 bg-bear/10 p-4 text-sm text-red-100">
+          <span>API error: {error}. Confirm backend service is reachable.</span>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            className="ml-3 shrink-0 rounded-lg border border-bear/40 px-3 py-1 text-xs uppercase tracking-[0.12em] hover:bg-bear/20"
+          >
+            Retry
+          </button>
         </section>
       )}
 
       <section className="rounded-2xl border border-border bg-panel/75 p-4 shadow-panel">
-        <PriceChart klines={klines} decisions={decisions} />
+        {loading && klines.length === 0 ? (
+          <div className="flex h-[420px] animate-pulse items-center justify-center rounded-xl bg-border/10 md:h-[480px]">
+            <p className="text-sm text-muted">Loading chart data...</p>
+          </div>
+        ) : (
+          <PriceChart klines={klines} decisions={decisions} />
+        )}
       </section>
 
       <SummaryCards

@@ -13,6 +13,8 @@ from backend.src.db.models import Trade
 
 @dataclass
 class AccountState:
+    """模拟账户状态快照，通过遍历全部历史交易记录重建。"""
+
     cash: float
     position_qty: float
     avg_entry_price: float
@@ -21,6 +23,12 @@ class AccountState:
 
 
 def _rebuild_account_state(db: Session, symbol: str) -> AccountState:
+    """
+    从交易历史记录重建当前账户状态。
+
+    遍历该品种的所有交易记录，按时间顺序计算现金余额、持仓数量、
+    均价、已实现盈亏和当日盈亏。
+    """
     cash = settings.initial_balance
     position_qty = 0.0
     avg_entry_price = 0.0
@@ -66,6 +74,7 @@ def _rebuild_account_state(db: Session, symbol: str) -> AccountState:
 
 
 def get_portfolio_snapshot(db: Session, symbol: str, mark_price: float | None) -> dict[str, Any]:
+    """获取当前投资组合快照，包括余额、权益、敞口和持仓明细。"""
     state = _rebuild_account_state(db=db, symbol=symbol)
     mark = float(mark_price or 0.0)
     unrealized_pnl = (mark - state.avg_entry_price) * state.position_qty if state.position_qty > 0 and mark > 0 else 0.0
@@ -100,6 +109,12 @@ def get_portfolio_snapshot(db: Session, symbol: str, mark_price: float | None) -
 
 
 def execute_decision(db: Session, decision: dict[str, Any], symbol: str, market_price: float) -> dict[str, Any]:
+    """
+    执行交易决策（模拟交易），根据buy/sell/hold动作创建交易记录。
+
+    包含滑点和手续费模拟，sell时自动平仓全部持仓。
+    返回执行前后的投资组合快照。
+    """
     action = str(decision.get("decision", "hold")).lower()
     state = _rebuild_account_state(db=db, symbol=symbol)
     snapshot = get_portfolio_snapshot(db=db, symbol=symbol, mark_price=market_price)

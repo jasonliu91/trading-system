@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Float, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Date, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.src.db.database import Base
@@ -42,7 +42,10 @@ class Decision(Base):
 
 
 class Trade(Base):
+    """模拟交易记录，关联到触发该交易的决策。"""
+
     __tablename__ = "trades"
+    __table_args__ = (Index("ix_trades_symbol_timestamp", "symbol", "timestamp"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, server_default=func.now())
@@ -53,6 +56,7 @@ class Trade(Base):
     fee: Mapped[float] = mapped_column(Float, default=0.0)
     slippage: Mapped[float] = mapped_column(Float, default=0.0)
     pnl: Mapped[float] = mapped_column(Float, default=0.0)
+    decision_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("decisions.id"), nullable=True, index=True)
     notes: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

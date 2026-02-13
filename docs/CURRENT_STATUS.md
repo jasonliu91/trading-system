@@ -1,7 +1,7 @@
 # Current Status
 
 **最后更新**: 2026-02-13
-**当前阶段**: Phase 1 — 本地联调验证完成，进入部署阶段
+**当前阶段**: Phase 1 — 代码质量改进完成，进入部署阶段
 **下一步**: VPS三进程部署落地（T025）
 
 ---
@@ -9,7 +9,7 @@
 ## 已完成
 
 - [x] 系统架构设计 (含Market Mind)
-- [x] 设计决策记录 (8条)
+- [x] 设计决策记录 (8条+)
 - [x] 项目文档框架
 - [x] Phase 1 PRD
 - [x] Market Mind初始模板
@@ -46,6 +46,19 @@
 - [x] 运行基线: backend启动路径统一为 `backend.src.*`，支持 `VENV_DIR` 覆盖与 Python>=3.10（2026-02-13）
 - [x] 本地修复: 前端 Next.js dev 缓存缺失 chunk 导致 500，清理 `.next` 并重启恢复；`/mind` 页面增加异常数据防御（2026-02-13）
 - [x] 本地修复: Dashboard 图表 marker 时间序列改为升序并过滤非法时间，修复 `setMarkers` 断言错误（2026-02-13）
+- [x] 代码质量: 后端核心模块添加中文 docstring 和类型标注（decision_engine, risk engine, paper_engine, market_mind, kline_service, binance_client, orchestrator）（2026-02-13）
+- [x] 测试: 添加 51 个单元测试（risk engine 10, decision engine 19, paper engine 11, market mind 11）（2026-02-13）
+- [x] 后端改进: Binance API 重试机制（指数退避，最多3次）（2026-02-13）
+- [x] 后端改进: orchestrator 分阶段错误处理、计时、连续失败追踪（2026-02-13）
+- [x] 后端改进: Market Mind JSON schema 验证（validate_market_mind）（2026-02-13）
+- [x] 后端改进: 绩效端点改为从真实交易数据计算资金曲线、最大回撤、盈亏比（2026-02-13）
+- [x] 后端改进: 健康检查端点增加数据库连通性和数据新鲜度检测（2026-02-13）
+- [x] 后端改进: Trade 表添加 decision_id 外键和复合索引（2026-02-13）
+- [x] 前端改进: 移动端汉堡菜单导航 + ARIA 无障碍标注（2026-02-13）
+- [x] 前端改进: WebSocket 指数退避重连 + 页面可见性感知（2026-02-13）
+- [x] 前端改进: K线图添加成交量柱（绿涨红跌）（2026-02-13）
+- [x] 前端改进: Dashboard/Performance 骨架屏加载 + 错误重试按钮（2026-02-13）
+- [x] 前端改进: Performance 页面移动端网格响应式修复（2026-02-13）
 
 ## 待开始
 
@@ -62,3 +75,4 @@
 | Claude API | ⚠️ SDK接口预留，待密钥接入 |
 | Web Dashboard | ✅ 核心页面可用（/ /mind /decisions /performance） |
 | Telegram Bot | ✅ 代码已就绪（待Token后可运行） |
+| 单元测试 | ✅ 51个测试通过（risk/decision/paper/mind） |

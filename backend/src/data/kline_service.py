@@ -28,6 +28,7 @@ def _query_klines(db: Session, symbol: str, timeframe: str, limit: int) -> Selec
 
 
 def get_recent_klines(db: Session, symbol: str, timeframe: str, limit: int) -> list[dict[str, Any]]:
+    """查询最近N根K线数据，按时间正序返回。"""
     rows = db.execute(_query_klines(db=db, symbol=symbol, timeframe=timeframe, limit=limit)).scalars().all()
     rows = list(reversed(rows))
     return [
@@ -46,6 +47,7 @@ def get_recent_klines(db: Session, symbol: str, timeframe: str, limit: int) -> l
 
 
 def upsert_klines(db: Session, klines: list[dict[str, Any]]) -> int:
+    """批量插入或更新K线数据，通过(symbol, timeframe, open_time)去重。"""
     if not klines:
         return 0
     statement = sqlite_insert(Kline).values(klines)
@@ -71,12 +73,14 @@ def fetch_and_store_klines(
     limit: int,
     client: BinanceKlineClient | None = None,
 ) -> int:
+    """从Binance获取K线数据并存入数据库，返回写入行数。"""
     client = client or BinanceKlineClient()
     klines = client.fetch_klines(symbol=symbol, timeframe=timeframe, limit=limit)
     return upsert_klines(db=db, klines=klines)
 
 
 def maybe_backfill_initial_klines(db: Session, symbol: str | None = None) -> dict[str, int]:
+    """检查各时间周期的K线数据量，不足时自动回填历史数据。"""
     symbol = symbol or settings.trading_pair
     inserted: dict[str, int] = {}
 
@@ -90,6 +94,7 @@ def maybe_backfill_initial_klines(db: Session, symbol: str | None = None) -> dic
 
 
 def latest_price_from_db(db: Session, symbol: str | None = None) -> float | None:
+    """从数据库获取最新价格，优先使用1h K线，回退到任意时间周期。"""
     symbol = symbol or settings.trading_pair
     row = (
         db.execute(
@@ -120,6 +125,7 @@ def latest_price_from_db(db: Session, symbol: str | None = None) -> float | None
 
 
 def fallback_mock_klines(timeframe: str, limit: int, symbol: str | None = None) -> list[dict[str, Any]]:
+    """生成模拟K线数据，用于数据库无数据时的前端展示降级。"""
     symbol = symbol or settings.trading_pair
     now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     step = {"1h": timedelta(hours=1), "4h": timedelta(hours=4), "1d": timedelta(days=1)}.get(timeframe, timedelta(hours=1))
