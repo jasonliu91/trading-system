@@ -17,3 +17,4 @@ out/
 logs/
 data/raw/
 data/cache/
+deploy/.rendered/

@@ -6,6 +6,9 @@ BACKEND_DIR="${PROJECT_DIR}/backend"
 FRONTEND_DIR="${PROJECT_DIR}/frontend"
 ENV_FILE="${BACKEND_DIR}/.env"
 NGINX_TEMPLATE="${PROJECT_DIR}/deploy/nginx/trading-system.conf"
+SYSTEMD_TEMPLATE_BACKEND="${PROJECT_DIR}/deploy/systemd/trading-backend.service"
+SYSTEMD_TEMPLATE_AGENT="${PROJECT_DIR}/deploy/systemd/trading-agent.service"
+SYSTEMD_TEMPLATE_FRONTEND="${PROJECT_DIR}/deploy/systemd/trading-frontend.service"
 
 fail() {
   echo "[FAIL] $1"
@@ -27,6 +30,9 @@ echo "Running preflight checks for ${PROJECT_DIR}"
 [ -d "${FRONTEND_DIR}" ] || fail "Frontend directory not found: ${FRONTEND_DIR}"
 [ -f "${ENV_FILE}" ] || fail "Missing backend .env file: ${ENV_FILE}"
 [ -f "${NGINX_TEMPLATE}" ] || fail "Missing nginx template: ${NGINX_TEMPLATE}"
+[ -f "${SYSTEMD_TEMPLATE_BACKEND}" ] || fail "Missing systemd template: ${SYSTEMD_TEMPLATE_BACKEND}"
+[ -f "${SYSTEMD_TEMPLATE_AGENT}" ] || fail "Missing systemd template: ${SYSTEMD_TEMPLATE_AGENT}"
+[ -f "${SYSTEMD_TEMPLATE_FRONTEND}" ] || fail "Missing systemd template: ${SYSTEMD_TEMPLATE_FRONTEND}"
 
 command -v python3 >/dev/null 2>&1 || fail "python3 is required"
 command -v npm >/dev/null 2>&1 || fail "npm is required"
@@ -40,9 +46,13 @@ else
 fi
 
 if grep -q "trade.your-domain.com" "${NGINX_TEMPLATE}"; then
-  warn "nginx template still uses placeholder domain trade.your-domain.com"
+  warn "nginx template still uses placeholder domain trade.your-domain.com (set PUBLIC_DOMAIN before install)"
 else
   ok "nginx domain appears customized"
+fi
+
+if grep -q "User=ubuntu" "${SYSTEMD_TEMPLATE_BACKEND}" || grep -q "User=ubuntu" "${SYSTEMD_TEMPLATE_AGENT}" || grep -q "User=ubuntu" "${SYSTEMD_TEMPLATE_FRONTEND}"; then
+  warn "systemd templates use default user ubuntu (set DEPLOY_USER before install if needed)"
 fi
 
 if grep -q "^TELEGRAM_BOT_TOKEN=$" "${ENV_FILE}"; then

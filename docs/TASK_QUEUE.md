@@ -96,7 +96,7 @@ frontend/src/ → app/, components/, lib/, hooks/, stores/
 ### 部署
 
 ### T025: VPS部署
-**P1** | 90分钟 | 三个进程 + supervisor/systemd + nginx反向代理（仓库内模板与脚本已就绪，待VPS执行）
+**P1** | 90分钟 | 三个进程 + supervisor/systemd + nginx反向代理（仓库内模板 + 渲染脚本 + preflight + post-check 已就绪，待VPS执行）
 
 ---
 
