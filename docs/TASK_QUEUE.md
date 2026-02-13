@@ -22,7 +22,7 @@ backend/src/ → data/, quant/, ai/, risk/, trading/, db/, orchestrator/, api/, 
 frontend/src/ → app/, components/, lib/, hooks/, stores/
 ```
 
-### T005: 整理OpenClaw现有代码
+### [x] T005: 整理OpenClaw现有代码（2026-02-12）
 **状态**: N/A（当前环境未安装OpenClaw，无可迁移代码）
 
 ---
