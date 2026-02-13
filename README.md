@@ -49,6 +49,11 @@ cd backend && python -m src.agent.main
 - `/decisions` 决策历史（展开查看推理和偏误检查）
 - `/performance` 绩效页（资金曲线 + 指标）
 
+## 部署模板
+
+- systemd/nginx/安装脚本位于 `deploy/`
+- 入口文档：`deploy/README.md`
+
 ## 阶段
 
 | Phase | 内容 | Market Mind |

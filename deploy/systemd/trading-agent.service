@@ -1,0 +1,16 @@
+[Unit]
+Description=ETH AI Trading Overseer Agent (Telegram)
+After=network.target trading-backend.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/trading-system/backend
+EnvironmentFile=/opt/trading-system/backend/.env
+ExecStart=/opt/trading-system/backend/.venv/bin/python -m src.agent.main
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+

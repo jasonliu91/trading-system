@@ -1,0 +1,17 @@
+[Unit]
+Description=ETH AI Trading Frontend (Next.js)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/trading-system/frontend
+Environment=NODE_ENV=production
+Environment=NEXT_PUBLIC_API_BASE_URL=https://trade.your-domain.com
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+
