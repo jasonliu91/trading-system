@@ -1,8 +1,8 @@
 # Current Status
 
 **最后更新**: 2026-02-12
-**当前阶段**: Phase 1 — Web端核心页面已完成
-**下一步**: 推进 Overseer Agent（T020-T024）与部署（T025）
+**当前阶段**: Phase 1 — Web + Agent基础能力已打通
+**下一步**: 完成Agent主动通知与指令确认流程（T022/T024），准备部署（T025）
 
 ---
 
@@ -31,11 +31,15 @@
 - [x] T017: 决策历史页面（推理展开）（2026-02-12）
 - [x] T018: 绩效页面（资金曲线 + 指标）（2026-02-12）
 - [x] T019: WebSocket实时推送（前后端联动）（2026-02-12）
+- [x] T020: Telegram Bot基础搭建（命令+消息收发）（2026-02-12）
+- [x] T021: Agent状态查询（持仓/绩效/决策/系统/市场观点）（2026-02-12）
+- [x] T023: Agent接收用户观点并写入Market Mind（2026-02-12）
 
 ## 待开始
 
 - [ ] T005: OpenClaw代码迁移
-- [ ] T020-T024: Overseer Agent功能
+- [ ] T022: Agent主动通知
+- [ ] T024: Agent指令执行确认流程
 - [ ] T025: VPS三进程部署
 
 ## 基础设施
@@ -48,4 +52,4 @@
 | Binance API | ✅ 已接入（公网可用时可拉取） |
 | Claude API | ⚠️ SDK接口预留，待密钥接入 |
 | Web Dashboard | ✅ 核心页面可用（/ /mind /decisions /performance） |
-| Telegram Bot | ❌ 未创建 |
+| Telegram Bot | ✅ 代码已就绪（待Token后可运行） |

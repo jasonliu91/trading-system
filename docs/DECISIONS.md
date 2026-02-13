@@ -4,6 +4,17 @@
 
 ---
 
+## D013: Overseer Agent 采用“命令优先 + 关键词回退”交互策略
+**日期**: 2026-02-12
+**决策**: Telegram Agent优先支持显式命令（/status /portfolio /performance /decision /mind /analyze /pause /resume /view），同时对中文关键词做回退识别；用户观点写入 `MarketMind.user_inputs`
+**原因**:
+- 命令路径最稳定，便于故障排查和自动化
+- 关键词回退提升自然对话可用性，符合PRD中的“随时问”场景
+- 用户观点先入库到 `user_inputs`，保持审计轨迹和后续人工/自动纳入流程
+**关键约束**:
+- Agent不直接做交易决策，仅调后端API获取结果或触发分析
+- 写入Market Mind必须通过后端API并保留 `change_summary`
+
 ## D012: 前端页面采用“多页拆分 + 统一API层 + WS增强”的实现
 **日期**: 2026-02-12
 **决策**: 将 Phase 1 Web 拆分为 `/`、`/mind`、`/decisions`、`/performance` 四个页面，统一通过 `frontend/src/lib/api.ts` 调用后端，并在 Dashboard 通过 `/ws/live` 做实时价格增强

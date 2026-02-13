@@ -20,3 +20,10 @@ uvicorn src.api.main:app --reload --port 8000
 curl -X POST http://localhost:8000/api/system/trigger-analysis
 ```
 
+## 4) Run Telegram Overseer Agent
+
+```bash
+source .venv/bin/activate
+python -m src.agent.main
+```
+
