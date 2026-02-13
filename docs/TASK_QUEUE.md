@@ -57,10 +57,10 @@ frontend/src/ → app/, components/, lib/, hooks/, stores/
 
 ### 前端
 
-### T014: 主看板 — K线图表
+### [x] T014: 主看板 — K线图表（2026-02-12）
 **P0** | 90分钟 | TradingView Lightweight Charts，1h/4h/1d切换，MA线，买卖点标注
 
-### T015: 主看板 — 信息面板
+### [x] T015: 主看板 — 信息面板（2026-02-12）
 **P0** | 60分钟 | 当前价格、账户概览、持仓卡片、最新AI决策卡片。暗色主题。
 
 ### T016: Market Mind页面

@@ -1,38 +1,61 @@
-const cards = [
-  { label: "Trading Pair", value: "ETHUSDT", tone: "text-text" },
-  { label: "Mode", value: "Paper Trading", tone: "text-accent" },
-  { label: "Core API", value: "http://localhost:8000", tone: "text-text" },
-  { label: "Market Mind", value: "/mind (coming)", tone: "text-text" }
-];
+"use client";
+
+import { PriceChart } from "@/components/dashboard/price-chart";
+import { SummaryCards } from "@/components/dashboard/summary-cards";
+import { TimeframeSwitcher } from "@/components/dashboard/timeframe-switcher";
+import { useDashboardData } from "@/hooks/use-dashboard-data";
+import { useDashboardStore } from "@/stores/dashboard-store";
 
 export default function HomePage() {
+  const { timeframe, setTimeframe, autoRefresh, toggleAutoRefresh } = useDashboardStore();
+  const { klines, decisions, portfolio, loading, error, lastUpdated, refresh } = useDashboardData(timeframe, autoRefresh);
+  const latestDecision = decisions[0] ?? null;
+
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-8 px-6 py-10 md:px-10">
-      <header className="space-y-3">
-        <p className="text-sm uppercase tracking-[0.24em] text-muted">ETH AI Trading System</p>
-        <h1 className="text-3xl font-semibold leading-tight text-text md:text-5xl">
-          Deterministic backbone, AI Market Mind, one shared control surface.
-        </h1>
+    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+      <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.24em] text-muted">ETH AI Trading System</p>
+          <h1 className="mt-1 text-2xl font-semibold text-text md:text-4xl">Dashboard</h1>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <TimeframeSwitcher value={timeframe} onChange={setTimeframe} />
+          <button
+            type="button"
+            onClick={toggleAutoRefresh}
+            className={`rounded-xl border px-3 py-2 text-xs uppercase tracking-[0.14em] ${
+              autoRefresh ? "border-accent text-accent" : "border-border text-muted"
+            }`}
+          >
+            Auto Refresh: {autoRefresh ? "On" : "Off"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            className="rounded-xl border border-border px-3 py-2 text-xs uppercase tracking-[0.14em] text-text hover:border-accent/60"
+          >
+            Refresh Now
+          </button>
+        </div>
       </header>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {cards.map((card) => (
-          <article
-            key={card.label}
-            className="rounded-2xl border border-border bg-panel/70 p-5 shadow-panel backdrop-blur"
-          >
-            <p className="text-xs uppercase tracking-[0.18em] text-muted">{card.label}</p>
-            <p className={`mt-2 text-lg font-medium ${card.tone}`}>{card.value}</p>
-          </article>
-        ))}
+      {error && (
+        <section className="rounded-2xl border border-bear/50 bg-bear/10 p-4 text-sm text-red-100">
+          API error: {error}. Confirm backend service is reachable at `NEXT_PUBLIC_API_BASE_URL`.
+        </section>
+      )}
+
+      <section className="rounded-2xl border border-border bg-panel/75 p-4 shadow-panel">
+        <PriceChart klines={klines} decisions={decisions} />
       </section>
 
-      <section className="rounded-2xl border border-border bg-panel/60 p-5">
-        <h2 className="text-lg font-medium text-text">Next Steps</h2>
-        <p className="mt-2 text-sm leading-6 text-muted">
-          Kline chart, decisions board, performance view, and Market Mind editor will be connected in Phase 1 tasks T014-T018.
-        </p>
-      </section>
+      <SummaryCards
+        portfolio={portfolio}
+        latestDecision={latestDecision}
+        lastUpdated={lastUpdated}
+        loading={loading}
+      />
     </main>
   );
 }
