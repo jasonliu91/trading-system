@@ -4,6 +4,18 @@
 
 ---
 
+## D025: Dashboard引入“策略脚本可视化 + AI筛选信号叠加”模式
+**日期**: 2026-02-13
+**决策**: 扩展 `/api/signals` 返回策略目录（说明+参数+Pine风格脚本）与历史信号 marker；前端 Dashboard 在同一K线图叠加 `Quant signals` 与 `AI decisions`，并提供策略开关与AI置信度筛选控件；决策引擎新增 `agent_filter`，用 `Market Mind.strategy_weights + market_regime` 对量化信号做认知过滤后再决策
+**原因**:
+- 用户需要接近 TradingView 的“策略可读 + 信号可见 + 决策可追溯”体验
+- 当前仅有决策箭头，无法验证每条策略为何触发以及AI如何筛选
+- 决策引擎需要体现“AI为核心、量化为输入”的角色分工，而不是直接照搬量化汇总
+**关键约束**:
+- 量化策略计算仍保持确定性，不在策略计算环节引入LLM
+- AI筛选结果必须结构化落库（`reasoning.agent_filter`）以支持审计
+- 图表 marker 输入保持时间升序，避免 Lightweight Charts 断言错误
+
 ## D024: 引入内置量化策略库并作为决策主信号源
 **日期**: 2026-02-13
 **决策**: 在 `backend/src/quant` 新增策略库（`ema_adx_daily`、`supertrend_daily`、`donchian_breakout_daily`）与聚合器（`composite_score` + `recommended_action`），并将聚合结果接入 AI 决策链路；`/api/signals` 从占位返回改为实时计算输出

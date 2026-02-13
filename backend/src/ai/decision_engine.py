@@ -8,7 +8,7 @@ from typing import Any
 
 from backend.src.config import settings
 from backend.src.mind.market_mind import inject_to_prompt
-from backend.src.quant.library import summarize_quant_signals
+from backend.src.quant.library import STRATEGY_WEIGHTS, summarize_quant_signals
 
 
 @dataclass
@@ -96,18 +96,135 @@ def _infer_mind_alignment(market_mind: dict[str, Any], signal: str) -> str:
     return "趋势不明确，符合Market Mind中降低噪音交易的原则。"
 
 
+def _extract_weight(value: Any) -> float | None:
+    if isinstance(value, dict):
+        return _extract_weight(value.get("weight"))
+    parsed = _safe_float(value, default=-1)
+    if parsed < 0:
+        return None
+    return parsed
+
+
+def _mind_weight_map(market_mind: dict[str, Any]) -> dict[str, float]:
+    raw = market_mind.get("strategy_weights", {})
+    if not isinstance(raw, dict):
+        return {}
+
+    result: dict[str, float] = {}
+    for key, value in raw.items():
+        weight = _extract_weight(value)
+        if weight is None:
+            continue
+        normalized = max(0.0, min(2.0, weight))
+        result[str(key)] = round(normalized, 4)
+    return result
+
+
+def _regime_multiplier(regime: str, category: str) -> float:
+    normalized = regime.lower()
+    trend_tokens = ("trend", "bull", "bear", "up", "down", "breakout", "趋势", "牛", "熊")
+    range_tokens = ("range", "sideway", "consolidat", "chop", "震荡", "区间")
+
+    if any(token in normalized for token in trend_tokens):
+        if category == "trend_following":
+            return 1.15
+        if category == "breakout":
+            return 1.05
+        if category == "mean_reversion":
+            return 0.85
+        return 1.0
+
+    if any(token in normalized for token in range_tokens):
+        if category == "mean_reversion":
+            return 1.15
+        if category == "trend_following":
+            return 0.85
+        if category == "breakout":
+            return 0.9
+        return 1.0
+
+    return 1.0
+
+
+def _clip(value: float, min_value: float, max_value: float) -> float:
+    return max(min_value, min(max_value, value))
+
+
+def _apply_agent_filter(
+    market_mind: dict[str, Any],
+    quant_signals: list[dict[str, Any]],
+) -> dict[str, Any]:
+    regime = str(market_mind.get("market_beliefs", {}).get("regime", ""))
+    mind_weights = _mind_weight_map(market_mind)
+    min_strength = 0.18
+
+    filtered_signals: list[dict[str, Any]] = []
+    for item in quant_signals:
+        strategy_name = str(item.get("strategy_name", ""))
+        category = str(item.get("category", "unknown"))
+
+        raw_signal = str(item.get("signal", "hold")).lower()
+        raw_strength = _clip(_safe_float(item.get("strength", 0.0)), 0.0, 1.0)
+
+        static_weight = _safe_float(STRATEGY_WEIGHTS.get(strategy_name), 1.0)
+        exact_weight = _safe_float(mind_weights.get(strategy_name), 1.0)
+        category_weight = _safe_float(mind_weights.get(category), 1.0)
+        regime_weight = _regime_multiplier(regime=regime, category=category)
+        combined_weight = _clip(exact_weight * category_weight * regime_weight, 0.15, 2.0)
+
+        adjusted_strength = _clip(raw_strength * combined_weight, 0.0, 1.0)
+        accepted = raw_signal in {"buy", "sell"} and adjusted_strength >= min_strength
+
+        filter_reason = "accepted"
+        filtered_signal = raw_signal
+        if raw_signal == "hold":
+            filter_reason = "raw_signal_is_hold"
+        elif not accepted:
+            filtered_signal = "hold"
+            filter_reason = "suppressed_by_agent_filter"
+
+        next_item = dict(item)
+        next_item["raw_signal"] = raw_signal
+        next_item["raw_strength"] = round(raw_strength, 4)
+        next_item["signal"] = filtered_signal
+        next_item["strength"] = round(adjusted_strength, 4)
+        next_item["agent_filter"] = {
+            "accepted": accepted,
+            "reason": filter_reason,
+            "static_weight": round(static_weight, 4),
+            "mind_strategy_weight": round(exact_weight, 4),
+            "mind_category_weight": round(category_weight, 4),
+            "regime_weight": round(regime_weight, 4),
+            "combined_weight": round(combined_weight, 4),
+            "threshold": min_strength,
+        }
+        filtered_signals.append(next_item)
+
+    summary = summarize_quant_signals(filtered_signals)
+    return {
+        "signals": filtered_signals,
+        "summary": summary,
+        "mind_weights": mind_weights,
+        "market_regime": regime,
+        "threshold": min_strength,
+    }
+
+
 def generate_decision(context: DecisionContext) -> dict[str, Any]:
     daily_closes = _close_series(context.daily_klines)
     hourly_closes = _close_series(context.hourly_klines)
     latest_price = hourly_closes[-1] if hourly_closes else (daily_closes[-1] if daily_closes else 0.0)
 
-    quant_summary = summarize_quant_signals(context.quant_signals)
+    raw_summary = summarize_quant_signals(context.quant_signals)
+    filtered_view = _apply_agent_filter(market_mind=context.market_mind, quant_signals=context.quant_signals)
+    quant_summary = filtered_view["summary"]
+
     decision = str(quant_summary.get("recommended_action", "hold")).lower()
     composite_score = _safe_float(quant_summary.get("composite_score", 0.0))
     confidence = _safe_float(quant_summary.get("confidence", 0.45))
     active_signal_count = int(_safe_float(quant_summary.get("active_signal_count", 0.0)))
 
-    # Fallback to MA trend when all strategies are neutral.
+    # Fallback to MA trend when all filtered strategy signals are neutral.
     if decision == "hold" and active_signal_count == 0 and daily_closes:
         decision, composite_score, short_ma, long_ma = _fallback_trend_decision(daily_closes=daily_closes)
         confidence = min(0.9, max(0.45, abs(composite_score) * 12 + 0.45))
@@ -122,16 +239,43 @@ def generate_decision(context: DecisionContext) -> dict[str, Any]:
     stop_loss = round(latest_price * (1 - settings.max_stop_loss_pct), 2) if latest_price else 0.0
     take_profit = round(latest_price * (1 + settings.max_stop_loss_pct * 2), 2) if latest_price else 0.0
 
+    filter_signals = []
+    for item in filtered_view["signals"]:
+        filter_signals.append(
+            {
+                "strategy_name": item.get("strategy_name"),
+                "display_name": item.get("display_name"),
+                "raw_signal": item.get("raw_signal"),
+                "raw_strength": item.get("raw_strength"),
+                "filtered_signal": item.get("signal"),
+                "filtered_strength": item.get("strength"),
+                "accepted": bool(item.get("agent_filter", {}).get("accepted", False)),
+                "reason": item.get("agent_filter", {}).get("reason", ""),
+            }
+        )
+
     reasoning = {
         "market_regime": context.market_mind.get("market_beliefs", {}).get("regime", "unknown"),
         "mind_alignment": _infer_mind_alignment(context.market_mind, decision),
         "quant_signals_summary": (
-            f"score={composite_score:.4f}, action={decision}, "
+            f"raw_score={_safe_float(raw_summary.get('composite_score', 0.0)):.4f}, "
+            f"filtered_score={composite_score:.4f}, action={decision}, "
             f"votes(buy/sell/hold)="
             f"{int(_safe_float(quant_summary.get('bullish_count', 0)))}"
             f"/{int(_safe_float(quant_summary.get('bearish_count', 0)))}"
             f"/{int(_safe_float(quant_summary.get('hold_count', 0)))}"
         ),
+        "agent_filter": {
+            "market_regime": filtered_view.get("market_regime"),
+            "mind_weights": filtered_view.get("mind_weights", {}),
+            "threshold": filtered_view.get("threshold", 0.18),
+            "raw_recommended_action": raw_summary.get("recommended_action"),
+            "raw_composite_score": raw_summary.get("composite_score"),
+            "filtered_recommended_action": quant_summary.get("recommended_action"),
+            "filtered_composite_score": quant_summary.get("composite_score"),
+            "active_signal_count": quant_summary.get("active_signal_count"),
+            "signals": filter_signals,
+        },
         "news_sentiment": "not_enabled_phase1",
         "key_factors": [
             f"quant_composite_score={composite_score:.4f}",
@@ -142,7 +286,7 @@ def generate_decision(context: DecisionContext) -> dict[str, Any]:
         ],
         "risk_considerations": ["执行硬性仓位上限", "执行止损距离上限"],
         "bias_check": _infer_bias_check(context.market_mind),
-        "final_logic": "基于量化策略库聚合信号与风险参数给出结构化建议。",
+        "final_logic": "AI agent根据Market Mind过滤量化信号后输出结构化决策，再交由风控执行。",
     }
 
     input_payload = {
@@ -150,6 +294,7 @@ def generate_decision(context: DecisionContext) -> dict[str, Any]:
         "daily_klines": context.daily_klines[-30:],
         "hourly_klines": context.hourly_klines[-24:],
         "quant_signals": context.quant_signals,
+        "quant_signals_filtered": filtered_view["signals"],
         "portfolio": context.portfolio,
         "recent_decisions": context.recent_decisions[-5:],
     }

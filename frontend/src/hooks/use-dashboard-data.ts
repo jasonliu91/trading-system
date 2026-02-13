@@ -1,13 +1,14 @@
 "use client";
 
-import { fetchDecisions, fetchKlines, fetchPortfolio } from "@/lib/api";
-import { DecisionItem, Kline, PortfolioSnapshot, Timeframe } from "@/lib/types";
+import { fetchDecisions, fetchKlines, fetchPortfolio, fetchSignals } from "@/lib/api";
+import { DecisionItem, Kline, PortfolioSnapshot, SignalsResponse, Timeframe } from "@/lib/types";
 import { useCallback, useEffect, useState } from "react";
 
 interface DashboardDataState {
   klines: Kline[];
   portfolio: PortfolioSnapshot | null;
   decisions: DecisionItem[];
+  signals: SignalsResponse | null;
   loading: boolean;
   error: string | null;
   lastUpdated: string | null;
@@ -18,6 +19,7 @@ export function useDashboardData(timeframe: Timeframe, autoRefresh: boolean): Da
   const [klines, setKlines] = useState<Kline[]>([]);
   const [portfolio, setPortfolio] = useState<PortfolioSnapshot | null>(null);
   const [decisions, setDecisions] = useState<DecisionItem[]>([]);
+  const [signals, setSignals] = useState<SignalsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
@@ -25,14 +27,16 @@ export function useDashboardData(timeframe: Timeframe, autoRefresh: boolean): Da
   const refresh = useCallback(async () => {
     setError(null);
     try {
-      const [klineData, portfolioData, decisionData] = await Promise.all([
+      const [klineData, portfolioData, decisionData, signalData] = await Promise.all([
         fetchKlines(timeframe),
         fetchPortfolio(),
-        fetchDecisions(30)
+        fetchDecisions(40),
+        fetchSignals(timeframe, 220)
       ]);
       setKlines(klineData);
       setPortfolio(portfolioData);
       setDecisions(decisionData);
+      setSignals(signalData);
       setLastUpdated(new Date().toISOString());
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : "Failed to fetch dashboard data");
@@ -60,10 +64,10 @@ export function useDashboardData(timeframe: Timeframe, autoRefresh: boolean): Da
     klines,
     portfolio,
     decisions,
+    signals,
     loading,
     error,
     lastUpdated,
     refresh
   };
 }
-

@@ -29,7 +29,7 @@ from backend.src.mind.market_mind import (
     update as update_market_mind,
 )
 from backend.src.orchestrator.service import run_analysis_cycle, scheduler_status, start_scheduler, stop_scheduler
-from backend.src.quant.library import build_quant_snapshot
+from backend.src.quant.library import build_quant_signal_markers, build_quant_snapshot, get_quant_strategy_catalog
 from backend.src.trading.paper_engine import get_portfolio_snapshot
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
@@ -234,7 +234,14 @@ def get_signals(
         source = "mock_fallback"
 
     snapshot = build_quant_snapshot(symbol=settings.trading_pair, timeframe=timeframe, klines=klines)
-    return {"items": snapshot["signals"], "summary": snapshot["summary"], "source": source}
+    markers = build_quant_signal_markers(symbol=settings.trading_pair, timeframe=timeframe, klines=klines, max_points=300)
+    return {
+        "items": snapshot["signals"],
+        "summary": snapshot["summary"],
+        "markers": markers,
+        "strategies": get_quant_strategy_catalog(),
+        "source": source,
+    }
 
 
 @app.get("/api/mind")

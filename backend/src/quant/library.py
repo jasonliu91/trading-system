@@ -15,6 +15,81 @@ STRATEGY_WEIGHTS: dict[str, float] = {
     "donchian_breakout_daily": 0.20,
 }
 
+STRATEGY_CATALOG: dict[str, dict[str, Any]] = {
+    "ema_adx_daily": {
+        "strategy_name": "ema_adx_daily",
+        "display_name": "EMA 20/50 + ADX",
+        "category": "trend_following",
+        "description": "Use EMA20/EMA50 cross direction and ADX trend strength to identify directional continuation.",
+        "parameters": {"ema_fast": 20, "ema_slow": 50, "adx_window": 14, "adx_trigger": 25},
+        "logic_summary": [
+            "Bullish when EMA20 > EMA50 and ADX >= 25.",
+            "Bearish when EMA20 < EMA50 and ADX >= 25.",
+            "Stay neutral when trend strength is weak.",
+        ],
+        "pine_script": """//@version=5
+indicator(\"EMA + ADX (Daily)\", overlay=true)
+emaFast = ta.ema(close, 20)
+emaSlow = ta.ema(close, 50)
+adxValue = ta.adx(14)
+longSignal = emaFast > emaSlow and adxValue >= 25
+shortSignal = emaFast < emaSlow and adxValue >= 25
+plot(emaFast, color=color.new(color.teal, 0))
+plot(emaSlow, color=color.new(color.orange, 0))
+plotshape(longSignal, style=shape.triangleup, color=color.lime)
+plotshape(shortSignal, style=shape.triangledown, color=color.red)
+""",
+    },
+    "supertrend_daily": {
+        "strategy_name": "supertrend_daily",
+        "display_name": "Supertrend ATR",
+        "category": "trend_following",
+        "description": "Track ATR-based dynamic bands; direction flips when price crosses band.",
+        "parameters": {"atr_period": 10, "multiplier": 3.0},
+        "logic_summary": [
+            "Direction = bullish when close stays above Supertrend line.",
+            "Direction = bearish when close drops below Supertrend line.",
+            "Signal strength scales with distance from the line.",
+        ],
+        "pine_script": """//@version=5
+indicator(\"Supertrend (Daily)\", overlay=true)
+[st, direction] = ta.supertrend(3.0, 10)
+longSignal = direction > 0
+shortSignal = direction < 0
+plot(st, color=direction > 0 ? color.green : color.red)
+plotshape(longSignal, style=shape.circle, color=color.lime)
+plotshape(shortSignal, style=shape.circle, color=color.maroon)
+""",
+    },
+    "donchian_breakout_daily": {
+        "strategy_name": "donchian_breakout_daily",
+        "display_name": "Donchian 20 Breakout",
+        "category": "breakout",
+        "description": "Detect breakout beyond previous 20-bar high/low channel.",
+        "parameters": {"lookback": 20},
+        "logic_summary": [
+            "Bullish breakout when close > previous 20-bar high.",
+            "Bearish breakout when close < previous 20-bar low.",
+            "No action while price remains inside channel.",
+        ],
+        "pine_script": """//@version=5
+indicator(\"Donchian Breakout (Daily)\", overlay=true)
+upper = ta.highest(high, 20)[1]
+lower = ta.lowest(low, 20)[1]
+longSignal = close > upper
+shortSignal = close < lower
+plot(upper, color=color.new(color.blue, 20))
+plot(lower, color=color.new(color.blue, 20))
+plotshape(longSignal, style=shape.arrowup, color=color.lime)
+plotshape(shortSignal, style=shape.arrowdown, color=color.red)
+""",
+    },
+}
+
+
+def get_quant_strategy_catalog() -> list[dict[str, Any]]:
+    return [dict(item) for item in STRATEGY_CATALOG.values()]
+
 
 def _safe_float(value: Any) -> float:
     try:
@@ -72,8 +147,11 @@ def _build_signal(
     indicators: dict[str, float],
     reasoning: str,
 ) -> dict[str, Any]:
+    meta = STRATEGY_CATALOG.get(strategy_name, {})
     return {
         "strategy_name": strategy_name,
+        "display_name": str(meta.get("display_name", strategy_name)),
+        "category": str(meta.get("category", "unknown")),
         "symbol": symbol,
         "timeframe": timeframe,
         "timestamp": timestamp,
@@ -265,7 +343,11 @@ def _donchian_signal(symbol: str, timeframe: str, df: pd.DataFrame) -> dict[str,
     )
 
 
-def summarize_quant_signals(signals: list[dict[str, Any]]) -> dict[str, Any]:
+def summarize_quant_signals(
+    signals: list[dict[str, Any]],
+    strategy_weights: dict[str, float] | None = None,
+    action_threshold: float = 0.20,
+) -> dict[str, Any]:
     if not signals:
         return {
             "recommended_action": "hold",
@@ -277,6 +359,8 @@ def summarize_quant_signals(signals: list[dict[str, Any]]) -> dict[str, Any]:
             "bearish_count": 0,
             "hold_count": 0,
         }
+
+    weight_map = strategy_weights or STRATEGY_WEIGHTS
 
     weighted_score = 0.0
     total_weight = 0.0
@@ -297,14 +381,14 @@ def summarize_quant_signals(signals: list[dict[str, Any]]) -> dict[str, Any]:
         else:
             hold += 1
 
-        weight = _safe_float(STRATEGY_WEIGHTS.get(str(item.get("strategy_name")), 1.0))
+        weight = _safe_float(weight_map.get(str(item.get("strategy_name")), STRATEGY_WEIGHTS.get(str(item.get("strategy_name")), 1.0)))
         weighted_score += weight * _signal_value(signal) * strength
         total_weight += weight
 
     composite_score = weighted_score / total_weight if total_weight > 0 else 0.0
-    if composite_score >= 0.20:
+    if composite_score >= action_threshold:
         action: SignalAction = "buy"
-    elif composite_score <= -0.20:
+    elif composite_score <= -action_threshold:
         action = "sell"
     else:
         action = "hold"
@@ -338,3 +422,77 @@ def build_quant_snapshot(symbol: str, timeframe: str, klines: list[dict[str, Any
         _donchian_signal(symbol=symbol, timeframe=timeframe, df=df),
     ]
     return {"signals": signals, "summary": summarize_quant_signals(signals)}
+
+
+def _build_markers_for_strategy(
+    strategy_name: str,
+    symbol: str,
+    timeframe: str,
+    df: pd.DataFrame,
+) -> list[dict[str, Any]]:
+    build_signal_fn = {
+        "ema_adx_daily": _ema_adx_signal,
+        "supertrend_daily": _supertrend_signal,
+        "donchian_breakout_daily": _donchian_signal,
+    }.get(strategy_name)
+    if build_signal_fn is None:
+        return []
+
+    markers: list[dict[str, Any]] = []
+    previous_signal: str = "hold"
+
+    for index in range(len(df)):
+        current_df = df.iloc[: index + 1]
+        signal_item = build_signal_fn(symbol=symbol, timeframe=timeframe, df=current_df)
+        signal = str(signal_item.get("signal", "hold")).lower()
+        if signal == previous_signal:
+            continue
+        previous_signal = signal
+
+        if signal not in {"buy", "sell"}:
+            continue
+
+        timestamp_raw = signal_item.get("timestamp")
+        timestamp = str(timestamp_raw) if timestamp_raw else str(df["open_time"].iloc[index].isoformat())
+        markers.append(
+            {
+                "strategy_name": strategy_name,
+                "display_name": signal_item.get("display_name", strategy_name),
+                "category": signal_item.get("category", "unknown"),
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "timestamp": timestamp,
+                "signal": signal,
+                "strength": _clip_strength(_safe_float(signal_item.get("strength", 0.0))),
+                "reasoning": signal_item.get("reasoning", ""),
+            }
+        )
+
+    return markers
+
+
+def build_quant_signal_markers(
+    symbol: str,
+    timeframe: str,
+    klines: list[dict[str, Any]],
+    max_points: int = 240,
+) -> list[dict[str, Any]]:
+    df = _build_dataframe(klines)
+    if df.empty:
+        return []
+
+    markers: list[dict[str, Any]] = []
+    for strategy_name in STRATEGY_CATALOG:
+        markers.extend(_build_markers_for_strategy(strategy_name=strategy_name, symbol=symbol, timeframe=timeframe, df=df))
+
+    markers.sort(
+        key=lambda item: (
+            pd.to_datetime(item.get("timestamp"), utc=True, errors="coerce")
+            if item.get("timestamp")
+            else pd.Timestamp("1970-01-01", tz="UTC"),
+            str(item.get("strategy_name", "")),
+        )
+    )
+    if len(markers) > max_points:
+        markers = markers[-max_points:]
+    return markers
