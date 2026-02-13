@@ -46,6 +46,7 @@
 - [x] 运行基线: backend启动路径统一为 `backend.src.*`，支持 `VENV_DIR` 覆盖与 Python>=3.10（2026-02-13）
 - [x] 本地修复: 前端 Next.js dev 缓存缺失 chunk 导致 500，清理 `.next` 并重启恢复；`/mind` 页面增加异常数据防御（2026-02-13）
 - [x] 本地修复: Dashboard 图表 marker 时间序列改为升序并过滤非法时间，修复 `setMarkers` 断言错误（2026-02-13）
+- [x] 本地回归验证: 从远程同步后完成 `compileall + frontend build + 三进程联调`；修复 `price-chart` 中 marker 类型收窄导致的 build 失败（2026-02-13）
 
 ## 待开始
 

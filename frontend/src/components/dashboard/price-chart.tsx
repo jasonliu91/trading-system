@@ -120,22 +120,22 @@ export function PriceChart({ klines, decisions }: { klines: Kline[]; decisions: 
     ma20Ref.current.setData(calculateMovingAverage(sortedKlines, 20));
     ma50Ref.current.setData(calculateMovingAverage(sortedKlines, 50));
 
-    const markers: SeriesMarker<Time>[] = decisions
+    const markers = decisions
       .filter((item) => item.decision !== "hold" && item.entry_price > 0)
-      .map((item) => {
+      .reduce<SeriesMarker<Time>[]>((output, item) => {
         const markerTime = toUnixSecond(item.timestamp);
         if (markerTime === null) {
-          return null;
+          return output;
         }
-        return {
+        output.push({
           time: markerTime as Time,
           position: item.decision === "sell" ? "aboveBar" : "belowBar",
           color: item.decision === "sell" ? "#f04438" : "#17b26a",
           shape: item.decision === "sell" ? "arrowDown" : "arrowUp",
           text: `${item.decision.toUpperCase()} ${item.position_size_pct.toFixed(1)}%`
-        };
-      })
-      .filter((item): item is SeriesMarker<Time> => item !== null)
+        });
+        return output;
+      }, [])
       .sort((a, b) => Number(a.time) - Number(b.time));
     candleRef.current.setMarkers(markers);
 
