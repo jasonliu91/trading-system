@@ -39,6 +39,13 @@ PUBLIC_DOMAIN=trade.example.com DEPLOY_USER=ubuntu PROJECT_DIR=/opt/trading-syst
 ./deploy/scripts/post_deploy_check.sh
 ```
 
+## One Command Deploy
+
+```bash
+cd /opt/trading-system
+PUBLIC_DOMAIN=trade.example.com DEPLOY_USER=ubuntu PROJECT_DIR=/opt/trading-system ./deploy/scripts/full_deploy.sh
+```
+
 ## Notes
 
 - `deploy/systemd/*.service` may need `User` and `WorkingDirectory` adjustments.
