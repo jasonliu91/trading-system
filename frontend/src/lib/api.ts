@@ -5,6 +5,8 @@ import {
   MarketMindResponse,
   PerformanceResponse,
   PortfolioSnapshot,
+  SystemHealthResponse,
+  SystemStatusResponse,
   Timeframe
 } from "@/lib/types";
 
@@ -67,4 +69,36 @@ export async function fetchMarketMindHistory(limit = 20): Promise<MarketMindHist
 
 export async function fetchPerformance(): Promise<PerformanceResponse> {
   return fetchJSON<PerformanceResponse>("/api/performance");
+}
+
+export async function fetchSystemStatus(): Promise<SystemStatusResponse> {
+  return fetchJSON<SystemStatusResponse>("/api/system/status");
+}
+
+export async function fetchSystemHealth(): Promise<SystemHealthResponse> {
+  return fetchJSON<SystemHealthResponse>("/api/system/health");
+}
+
+export async function triggerAnalysis(): Promise<Record<string, unknown>> {
+  const response = await fetch(`${API_BASE_URL}/api/system/trigger-analysis`, { method: "POST" });
+  if (!response.ok) {
+    throw new Error(`Failed to trigger analysis: ${response.status} ${response.statusText}`);
+  }
+  return (await response.json()) as Record<string, unknown>;
+}
+
+export async function pauseSystem(): Promise<Record<string, unknown>> {
+  const response = await fetch(`${API_BASE_URL}/api/system/pause`, { method: "POST" });
+  if (!response.ok) {
+    throw new Error(`Failed to pause system: ${response.status} ${response.statusText}`);
+  }
+  return (await response.json()) as Record<string, unknown>;
+}
+
+export async function resumeSystem(): Promise<Record<string, unknown>> {
+  const response = await fetch(`${API_BASE_URL}/api/system/resume`, { method: "POST" });
+  if (!response.ok) {
+    throw new Error(`Failed to resume system: ${response.status} ${response.statusText}`);
+  }
+  return (await response.json()) as Record<string, unknown>;
 }

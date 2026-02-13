@@ -8,7 +8,8 @@ const navItems = [
   { href: "/", label: "Dashboard" },
   { href: "/mind", label: "Market Mind" },
   { href: "/decisions", label: "Decisions" },
-  { href: "/performance", label: "Performance" }
+  { href: "/performance", label: "Performance" },
+  { href: "/system", label: "System" }
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -45,4 +46,3 @@ export function AppShell({ children }: { children: ReactNode }) {
     </div>
   );
 }
-

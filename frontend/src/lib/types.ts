@@ -95,3 +95,18 @@ export interface LivePayload {
   latest_decision: string | null;
   latest_decision_id: number | null;
 }
+
+export interface SystemStatusResponse {
+  trading: string;
+  scheduler: { status: string } | string;
+  data_pipeline: string;
+  agent: string;
+  analysis_interval_hours: number;
+  last_decision_at: string | null;
+}
+
+export interface SystemHealthResponse {
+  status: string;
+  service: string;
+  scheduler?: { status: string } | string;
+}

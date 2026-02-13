@@ -23,7 +23,7 @@ frontend/src/ → app/, components/, lib/, hooks/, stores/
 ```
 
 ### T005: 整理OpenClaw现有代码
-**P1** | 60分钟 | 将OpenClaw市场分析代码迁移到新项目
+**状态**: N/A（当前环境未安装OpenClaw，无可迁移代码）
 
 ---
 
