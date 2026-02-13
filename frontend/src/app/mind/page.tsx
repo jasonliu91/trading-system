@@ -8,6 +8,20 @@ function prettyJSON(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
+}
+
+function asRecordArray(value: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is Record<string, unknown> => !!item && typeof item === "object" && !Array.isArray(item));
+}
+
 export default function MarketMindPage() {
   const [marketMind, setMarketMind] = useState<Record<string, unknown> | null>(null);
   const [promptPreview, setPromptPreview] = useState<string>("");
@@ -23,11 +37,22 @@ export default function MarketMindPage() {
     if (!marketMind) {
       return null;
     }
+
+    const rawStrategyWeights = asRecord(marketMind.strategy_weights);
+    const normalizedStrategyWeights: Record<string, { weight?: number; reason?: string }> = {};
+    for (const [key, value] of Object.entries(rawStrategyWeights)) {
+      const config = asRecord(value);
+      normalizedStrategyWeights[key] = {
+        weight: typeof config.weight === "number" ? config.weight : undefined,
+        reason: typeof config.reason === "string" ? config.reason : undefined
+      };
+    }
+
     return {
-      marketBeliefs: (marketMind.market_beliefs as Record<string, unknown>) || {},
-      strategyWeights: (marketMind.strategy_weights as Record<string, { weight?: number; reason?: string }>) || {},
-      lessons: (marketMind.lessons_learned as Array<Record<string, unknown>>) || [],
-      biases: (marketMind.bias_awareness as Array<Record<string, unknown>>) || []
+      marketBeliefs: asRecord(marketMind.market_beliefs),
+      strategyWeights: normalizedStrategyWeights,
+      lessons: asRecordArray(marketMind.lessons_learned),
+      biases: asRecordArray(marketMind.bias_awareness)
     };
   }, [marketMind]);
 

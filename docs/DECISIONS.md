@@ -4,6 +4,17 @@
 
 ---
 
+## D022: 前端开发模式加入缓存损坏恢复与弱结构数据防御
+**日期**: 2026-02-13
+**决策**: 当 Next.js 开发模式出现 `.next/server` chunk 缺失（如 `Cannot find module './24.js'`）时，采用“停止服务 -> 清理 `frontend/.next` -> 重启 dev”作为标准恢复步骤；同时 `/mind` 页面对 `strategy_weights/lessons_learned/bias_awareness` 做类型归一化，避免手工编辑后的弱结构数据触发前端崩溃
+**原因**:
+- 本地 HMR 过程中可能出现缓存不一致，直接导致首页 500
+- Market Mind 支持手工 JSON 编辑，数据形态不稳定时需要前端容错
+- 保持调试链路可快速自愈，避免误判为后端或业务逻辑故障
+**关键约束**:
+- 该恢复步骤仅用于开发环境，不作为生产故障处理方案
+- 容错只做展示层兜底，不替代后端 schema 约束
+
 ## D021: 本地运行基线统一为仓库内独立路径
 **日期**: 2026-02-13
 **决策**: 本地与部署启动统一使用 `PYTHONPATH=<repo-root>` + `backend.src.*` 模块路径；`dev_start.sh` 增加 `VENV_DIR` 覆盖并优先使用 `backend/.venv310`；`setup_venv.sh` 强制 Python >= 3.10
