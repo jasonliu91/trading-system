@@ -8,6 +8,7 @@ from typing import Any
 
 from backend.src.config import settings
 from backend.src.mind.market_mind import inject_to_prompt
+from backend.src.quant.library import summarize_quant_signals
 
 
 @dataclass
@@ -15,6 +16,7 @@ class DecisionContext:
     market_mind: dict[str, Any]
     daily_klines: list[dict[str, Any]]
     hourly_klines: list[dict[str, Any]]
+    quant_signals: list[dict[str, Any]]
     portfolio: dict[str, Any]
     recent_decisions: list[dict[str, Any]]
 
@@ -39,11 +41,26 @@ def _mean(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
+def _fallback_trend_decision(daily_closes: list[float]) -> tuple[str, float, float, float]:
+    short_ma = _mean(daily_closes[-7:]) if len(daily_closes) >= 7 else _mean(daily_closes)
+    long_ma = _mean(daily_closes[-21:]) if len(daily_closes) >= 21 else _mean(daily_closes)
+    trend_score = ((short_ma - long_ma) / long_ma) if long_ma > 0 else 0.0
+
+    if trend_score > 0.01:
+        decision = "buy"
+    elif trend_score < -0.01:
+        decision = "sell"
+    else:
+        decision = "hold"
+    return decision, trend_score, short_ma, long_ma
+
+
 def build_prompt(context: DecisionContext) -> str:
     mind_prompt = inject_to_prompt(context.market_mind)
     payload = {
         "daily_klines": context.daily_klines[-30:],
         "hourly_klines": context.hourly_klines[-24:],
+        "quant_signals": context.quant_signals,
         "portfolio": context.portfolio,
         "recent_decisions": context.recent_decisions[-5:],
         "output_required_fields": [
@@ -84,21 +101,20 @@ def generate_decision(context: DecisionContext) -> dict[str, Any]:
     hourly_closes = _close_series(context.hourly_klines)
     latest_price = hourly_closes[-1] if hourly_closes else (daily_closes[-1] if daily_closes else 0.0)
 
-    short_ma = _mean(daily_closes[-7:]) if len(daily_closes) >= 7 else _mean(daily_closes)
-    long_ma = _mean(daily_closes[-21:]) if len(daily_closes) >= 21 else _mean(daily_closes)
+    quant_summary = summarize_quant_signals(context.quant_signals)
+    decision = str(quant_summary.get("recommended_action", "hold")).lower()
+    composite_score = _safe_float(quant_summary.get("composite_score", 0.0))
+    confidence = _safe_float(quant_summary.get("confidence", 0.45))
+    active_signal_count = int(_safe_float(quant_summary.get("active_signal_count", 0.0)))
 
-    trend_score = 0.0
-    if long_ma > 0:
-        trend_score = (short_ma - long_ma) / long_ma
-
-    if trend_score > 0.01:
-        decision = "buy"
-    elif trend_score < -0.01:
-        decision = "sell"
+    # Fallback to MA trend when all strategies are neutral.
+    if decision == "hold" and active_signal_count == 0 and daily_closes:
+        decision, composite_score, short_ma, long_ma = _fallback_trend_decision(daily_closes=daily_closes)
+        confidence = min(0.9, max(0.45, abs(composite_score) * 12 + 0.45))
     else:
-        decision = "hold"
+        short_ma = _mean(daily_closes[-7:]) if len(daily_closes) >= 7 else _mean(daily_closes)
+        long_ma = _mean(daily_closes[-21:]) if len(daily_closes) >= 21 else _mean(daily_closes)
 
-    confidence = min(0.9, max(0.45, abs(trend_score) * 12 + 0.45))
     desired_position_pct = round(min(settings.max_position_pct * 100, confidence * 20), 2)
     if decision == "hold":
         desired_position_pct = 0.0
@@ -109,21 +125,31 @@ def generate_decision(context: DecisionContext) -> dict[str, Any]:
     reasoning = {
         "market_regime": context.market_mind.get("market_beliefs", {}).get("regime", "unknown"),
         "mind_alignment": _infer_mind_alignment(context.market_mind, decision),
-        "quant_signals_summary": f"daily_short_ma={short_ma:.2f}, daily_long_ma={long_ma:.2f}",
+        "quant_signals_summary": (
+            f"score={composite_score:.4f}, action={decision}, "
+            f"votes(buy/sell/hold)="
+            f"{int(_safe_float(quant_summary.get('bullish_count', 0)))}"
+            f"/{int(_safe_float(quant_summary.get('bearish_count', 0)))}"
+            f"/{int(_safe_float(quant_summary.get('hold_count', 0)))}"
+        ),
         "news_sentiment": "not_enabled_phase1",
         "key_factors": [
-            f"trend_score={trend_score:.4f}",
+            f"quant_composite_score={composite_score:.4f}",
+            f"active_signal_count={active_signal_count}",
+            f"daily_short_ma={short_ma:.2f}",
+            f"daily_long_ma={long_ma:.2f}",
             f"latest_price={latest_price:.2f}",
         ],
         "risk_considerations": ["执行硬性仓位上限", "执行止损距离上限"],
         "bias_check": _infer_bias_check(context.market_mind),
-        "final_logic": "基于日线均线趋势和风险参数给出结构化建议。",
+        "final_logic": "基于量化策略库聚合信号与风险参数给出结构化建议。",
     }
 
     input_payload = {
         "mind": context.market_mind,
         "daily_klines": context.daily_klines[-30:],
         "hourly_klines": context.hourly_klines[-24:],
+        "quant_signals": context.quant_signals,
         "portfolio": context.portfolio,
         "recent_decisions": context.recent_decisions[-5:],
     }
@@ -142,4 +168,3 @@ def generate_decision(context: DecisionContext) -> dict[str, Any]:
         "input_hash": input_hash,
         "prompt_preview": build_prompt(context),
     }
-

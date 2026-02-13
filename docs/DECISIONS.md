@@ -4,6 +4,18 @@
 
 ---
 
+## D024: 引入内置量化策略库并作为决策主信号源
+**日期**: 2026-02-13
+**决策**: 在 `backend/src/quant` 新增策略库（`ema_adx_daily`、`supertrend_daily`、`donchian_breakout_daily`）与聚合器（`composite_score` + `recommended_action`），并将聚合结果接入 AI 决策链路；`/api/signals` 从占位返回改为实时计算输出
+**原因**:
+- 当前决策引擎仅基于简化均线差，无法支撑 Phase 2 的“量化信号引擎”目标
+- 需要一个可解释、可扩展的策略注册点，为后续回测与策略加权做准备
+- 让前端/Agent/运维可直接通过 API 查看量化信号明细与聚合结论
+**关键约束**:
+- 继续保持“确定性骨架”：量化信号计算不依赖 LLM
+- 保留风险引擎硬规则优先级，量化信号只影响决策建议，不直接绕过风控
+- `build_prompt` 仅注入最近30根日线，但量化库可使用更长历史窗口（当前120根）以保证指标有效性
+
 ## D023: 图表输入统一按时间升序后再送入 Lightweight Charts
 **日期**: 2026-02-13
 **决策**: Dashboard `price-chart` 在渲染前对 `klines` 和 `decision markers` 执行时间升序排序，并过滤无法解析时间的 marker
