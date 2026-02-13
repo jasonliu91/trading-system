@@ -43,6 +43,9 @@ class BackendAPIClient:
     def get_system_status(self) -> dict[str, Any]:
         return self._request("GET", "/api/system/status")
 
+    def get_health(self) -> dict[str, Any]:
+        return self._request("GET", "/api/system/health")
+
     def get_portfolio(self) -> dict[str, Any]:
         return self._request("GET", "/api/portfolio")
 
@@ -54,11 +57,25 @@ class BackendAPIClient:
             return value if isinstance(value, dict) else None
         return None
 
+    def get_latest_trade(self) -> dict[str, Any] | None:
+        payload = self._request("GET", "/api/trades?limit=1")
+        items = payload.get("items", [])
+        if isinstance(items, list) and items:
+            value = items[0]
+            return value if isinstance(value, dict) else None
+        return None
+
     def get_performance(self) -> dict[str, Any]:
         return self._request("GET", "/api/performance")
 
     def get_market_mind(self) -> dict[str, Any]:
         return self._request("GET", "/api/mind")
+
+    def get_daily_summary(self) -> dict[str, Any]:
+        return self._request("GET", "/api/summary/daily")
+
+    def get_weekly_summary(self) -> dict[str, Any]:
+        return self._request("GET", "/api/summary/weekly")
 
     def trigger_analysis(self) -> dict[str, Any]:
         return self._request("POST", "/api/system/trigger-analysis")
@@ -96,4 +113,3 @@ class BackendAPIClient:
             },
         )
         return updated
-

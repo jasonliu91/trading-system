@@ -77,6 +77,21 @@ def _serialize_decision(row: Decision) -> dict[str, Any]:
     }
 
 
+def _serialize_trade(row: Trade) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "timestamp": row.timestamp.isoformat() if row.timestamp else None,
+        "symbol": row.symbol,
+        "side": row.side,
+        "quantity": row.quantity,
+        "price": row.price,
+        "fee": row.fee,
+        "slippage": row.slippage,
+        "pnl": row.pnl,
+        "notes": row.notes,
+    }
+
+
 def _latest_decision(db: Session) -> Decision | None:
     return db.execute(select(Decision).order_by(Decision.timestamp.desc(), Decision.id.desc()).limit(1)).scalars().first()
 
@@ -156,6 +171,17 @@ def get_decision_detail(decision_id: int, db: Session = Depends(get_db)) -> dict
     if row is None:
         raise HTTPException(status_code=404, detail="Decision not found")
     return _serialize_decision(row)
+
+
+@app.get("/api/trades")
+def get_trades(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    offset = (page - 1) * limit
+    rows = db.execute(select(Trade).order_by(Trade.timestamp.desc(), Trade.id.desc()).offset(offset).limit(limit)).scalars().all()
+    return {"items": [_serialize_trade(row) for row in rows], "page": page, "limit": limit}
 
 
 @app.get("/api/performance")
@@ -337,4 +363,3 @@ async def ws_live(websocket: WebSocket) -> None:
             await asyncio.sleep(2)
     except WebSocketDisconnect:
         return
-

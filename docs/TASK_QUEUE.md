@@ -84,13 +84,13 @@ frontend/src/ → app/, components/, lib/, hooks/, stores/
 ### [x] T021: Agent状态查询（2026-02-12）
 **P0** | 60分钟 | 用户可问"持仓"/"绩效"/"最新决策"/"系统状态"/"你怎么看市场"（读取Market Mind）
 
-### T022: Agent主动通知
+### [x] T022: Agent主动通知（2026-02-12）
 **P1** | 60分钟 | 新决策/止损止盈/系统异常/每日日报 → Telegram推送
 
 ### [x] T023: Agent接收用户输入到Market Mind（2026-02-12）
 **P1** | 45分钟 | 用户说市场观点 → Agent写入Market Mind的user_inputs → 确认回复
 
-### T024: Agent指令执行
+### [x] T024: Agent指令执行（2026-02-12）
 **P2** | 45分钟 | "触发分析"/"暂停交易"/"恢复交易"（带确认）
 
 ### 部署

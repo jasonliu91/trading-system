@@ -4,6 +4,17 @@
 
 ---
 
+## D014: Agent危险操作采用“确认执行”与定时通知机制
+**日期**: 2026-02-12
+**决策**: 对 `trigger-analysis/pause/resume` 采用二次确认（`/confirm` `/cancel`）执行；Agent通过定时任务主动推送新决策、交易事件、系统健康异常与每日日报
+**原因**:
+- 避免误触发造成系统状态变化
+- 用户不盯盘时仍能第一时间获取关键事件
+- 与“Agent不直接做决策，只做管家与通知”定位一致
+**关键约束**:
+- 所有执行动作必须走后端API，不在Agent侧实现业务逻辑
+- 通知逻辑需要可关闭（无 `TELEGRAM_CHAT_ID` 时不发送）
+
 ## D013: Overseer Agent 采用“命令优先 + 关键词回退”交互策略
 **日期**: 2026-02-12
 **决策**: Telegram Agent优先支持显式命令（/status /portfolio /performance /decision /mind /analyze /pause /resume /view），同时对中文关键词做回退识别；用户观点写入 `MarketMind.user_inputs`
