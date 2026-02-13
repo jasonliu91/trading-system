@@ -15,6 +15,12 @@ export interface DecisionReasoning {
   mind_alignment?: string;
   bias_check?: string;
   final_logic?: string;
+  risk_check?: {
+    approved: boolean;
+    violations: string[];
+    adjustments: string[];
+  };
+  [key: string]: unknown;
 }
 
 export interface DecisionItem {
@@ -28,6 +34,7 @@ export interface DecisionItem {
   confidence: number;
   reasoning: DecisionReasoning;
   model_used: string;
+  input_hash?: string;
 }
 
 export interface PortfolioPosition {
@@ -50,3 +57,41 @@ export interface PortfolioSnapshot {
   positions: PortfolioPosition[];
 }
 
+export interface MarketMindHistoryItem {
+  id: number;
+  changed_at: string;
+  changed_by: string;
+  change_summary: string;
+  previous_state: Record<string, unknown>;
+  new_state: Record<string, unknown>;
+}
+
+export interface MarketMindResponse {
+  market_mind: Record<string, unknown>;
+  prompt_preview: string;
+}
+
+export interface PerformanceMetricBundle {
+  total_return_pct: number;
+  max_drawdown_pct: number;
+  win_rate: number;
+  profit_factor: number;
+}
+
+export interface PerformancePoint {
+  date: string;
+  equity: number;
+}
+
+export interface PerformanceResponse {
+  equity_curve: PerformancePoint[];
+  metrics: PerformanceMetricBundle;
+}
+
+export interface LivePayload {
+  timestamp: string;
+  symbol: string;
+  price: number;
+  latest_decision: string | null;
+  latest_decision_id: number | null;
+}

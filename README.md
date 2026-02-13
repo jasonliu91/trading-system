@@ -42,6 +42,13 @@ cd frontend && npm install && npm run dev
 cd backend && python -m src.agent.main
 ```
 
+## 当前可用页面
+
+- `/` Dashboard（K线 + 持仓 + 最新决策 + WS实时价格）
+- `/mind` Market Mind（展示、JSON编辑、历史）
+- `/decisions` 决策历史（展开查看推理和偏误检查）
+- `/performance` 绩效页（资金曲线 + 指标）
+
 ## 阶段
 
 | Phase | 内容 | Market Mind |

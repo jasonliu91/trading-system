@@ -1,8 +1,8 @@
 # Current Status
 
 **最后更新**: 2026-02-12
-**当前阶段**: Phase 1 — 后端闭环 + Dashboard首屏已打通
-**下一步**: 推进 Market Mind/Decisions/Performance 页面（T016-T018）与 WebSocket 实时推送（T019）
+**当前阶段**: Phase 1 — Web端核心页面已完成
+**下一步**: 推进 Overseer Agent（T020-T024）与部署（T025）
 
 ---
 
@@ -27,11 +27,14 @@
 - [x] T013: APScheduler调度分析闭环（2026-02-12）
 - [x] T014: 主看板K线图表（timeframe切换 + MA + 买卖标注）（2026-02-12）
 - [x] T015: 主看板信息面板（价格/账户/最新决策）（2026-02-12）
+- [x] T016: Market Mind页面（展示/编辑/历史）（2026-02-12）
+- [x] T017: 决策历史页面（推理展开）（2026-02-12）
+- [x] T018: 绩效页面（资金曲线 + 指标）（2026-02-12）
+- [x] T019: WebSocket实时推送（前后端联动）（2026-02-12）
 
 ## 待开始
 
 - [ ] T005: OpenClaw代码迁移
-- [ ] T016-T019: 其余前端页面与实时推送
 - [ ] T020-T024: Overseer Agent功能
 - [ ] T025: VPS三进程部署
 
@@ -44,4 +47,5 @@
 | Git | ✅ 已初始化 |
 | Binance API | ✅ 已接入（公网可用时可拉取） |
 | Claude API | ⚠️ SDK接口预留，待密钥接入 |
+| Web Dashboard | ✅ 核心页面可用（/ /mind /decisions /performance） |
 | Telegram Bot | ❌ 未创建 |

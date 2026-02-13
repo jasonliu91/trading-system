@@ -4,6 +4,17 @@
 
 ---
 
+## D012: 前端页面采用“多页拆分 + 统一API层 + WS增强”的实现
+**日期**: 2026-02-12
+**决策**: 将 Phase 1 Web 拆分为 `/`、`/mind`、`/decisions`、`/performance` 四个页面，统一通过 `frontend/src/lib/api.ts` 调用后端，并在 Dashboard 通过 `/ws/live` 做实时价格增强
+**原因**:
+- 页面职责清晰，便于后续独立迭代和问题定位
+- API调用集中管理，减少重复请求逻辑与类型漂移
+- WebSocket用于增强实时感，轮询继续承担兜底刷新，稳定性更高
+**关键约束**:
+- Market Mind页面必须支持手动编辑与历史追踪
+- 决策历史必须可展开查看 `mind_alignment` 与 `bias_check`
+
 ## D011: Dashboard 首屏采用“图表优先 + API直连”实现
 **日期**: 2026-02-12
 **决策**: Phase 1主看板先实现轻量图表与信息卡片，采用 `lightweight-charts + Zustand` 直连后端 API，实时刷新先用轮询（15秒）稳定交付

@@ -6,14 +6,19 @@ export function SummaryCards({
   portfolio,
   latestDecision,
   lastUpdated,
-  loading
+  loading,
+  livePrice,
+  liveStatus
 }: {
   portfolio: PortfolioSnapshot | null;
   latestDecision: DecisionItem | null;
   lastUpdated: string | null;
   loading: boolean;
+  livePrice: number | null;
+  liveStatus: "connecting" | "open" | "closed" | "error";
 }) {
-  const priceText = portfolio ? portfolio.mark_price.toFixed(2) : "--";
+  const markPrice = livePrice ?? portfolio?.mark_price ?? null;
+  const priceText = markPrice !== null ? markPrice.toFixed(2) : "--";
   const equityText = portfolio ? portfolio.equity.toFixed(2) : "--";
   const exposureText = portfolio ? `${portfolio.exposure_pct.toFixed(2)}%` : "--";
   const decisionText = latestDecision ? latestDecision.decision.toUpperCase() : "--";
@@ -24,6 +29,7 @@ export function SummaryCards({
       <article className="rounded-2xl border border-border bg-panel/70 p-4 shadow-panel">
         <p className="text-xs uppercase tracking-[0.16em] text-muted">Mark Price</p>
         <p className="mt-2 text-2xl font-semibold text-text">{priceText}</p>
+        <p className="text-xs text-muted">Live: {liveStatus}</p>
       </article>
 
       <article className="rounded-2xl border border-border bg-panel/70 p-4 shadow-panel">
@@ -63,4 +69,3 @@ export function SummaryCards({
     </section>
   );
 }
-

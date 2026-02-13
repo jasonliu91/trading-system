@@ -4,11 +4,13 @@ import { PriceChart } from "@/components/dashboard/price-chart";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { TimeframeSwitcher } from "@/components/dashboard/timeframe-switcher";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+import { useLiveFeed } from "@/hooks/use-live-feed";
 import { useDashboardStore } from "@/stores/dashboard-store";
 
 export default function HomePage() {
   const { timeframe, setTimeframe, autoRefresh, toggleAutoRefresh } = useDashboardStore();
   const { klines, decisions, portfolio, loading, error, lastUpdated, refresh } = useDashboardData(timeframe, autoRefresh);
+  const live = useLiveFeed(true);
   const latestDecision = decisions[0] ?? null;
 
   return (
@@ -55,8 +57,9 @@ export default function HomePage() {
         latestDecision={latestDecision}
         lastUpdated={lastUpdated}
         loading={loading}
+        livePrice={live.latest?.price ?? null}
+        liveStatus={live.status}
       />
     </main>
   );
 }
-
