@@ -29,6 +29,7 @@ cp /opt/trading-system/backend/.env.example /opt/trading-system/backend/.env
 
 ```bash
 cd /opt/trading-system
+./deploy/scripts/preflight.sh
 ./deploy/scripts/install_services.sh
 ```
 
@@ -44,4 +45,3 @@ curl http://127.0.0.1:8000/api/system/health
 - `deploy/systemd/*.service` may need `User` and `WorkingDirectory` adjustments.
 - `deploy/nginx/trading-system.conf` must replace `trade.your-domain.com`.
 - Add TLS with certbot after nginx site is enabled.
-

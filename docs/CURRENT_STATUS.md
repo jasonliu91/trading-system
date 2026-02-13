@@ -37,6 +37,7 @@
 - [x] T023: Agent接收用户观点并写入Market Mind（2026-02-12）
 - [x] T024: Agent指令执行确认流程（/confirm /cancel）（2026-02-12）
 - [x] T025准备: systemd/nginx部署模板与安装脚本（2026-02-12）
+- [x] T025准备: 部署前检查脚本 preflight（2026-02-12）
 
 ## 待开始
 
