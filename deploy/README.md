@@ -46,6 +46,13 @@ cd /opt/trading-system
 PUBLIC_DOMAIN=trade.example.com DEPLOY_USER=ubuntu PROJECT_DIR=/opt/trading-system ./deploy/scripts/full_deploy.sh
 ```
 
+## Dry Run (推荐先执行)
+
+```bash
+cd /opt/trading-system
+DRY_RUN=true PUBLIC_DOMAIN=trade.example.com DEPLOY_USER=ubuntu PROJECT_DIR=/opt/trading-system ./deploy/scripts/full_deploy.sh
+```
+
 ## Notes
 
 - `deploy/systemd/*.service` may need `User` and `WorkingDirectory` adjustments.

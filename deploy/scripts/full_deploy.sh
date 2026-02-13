@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="${PROJECT_DIR:-/opt/trading-system}"
+DRY_RUN="${DRY_RUN:-false}"
 
 SKIP_BACKEND_SETUP="${SKIP_BACKEND_SETUP:-false}"
 SKIP_FRONTEND_BUILD="${SKIP_FRONTEND_BUILD:-false}"
@@ -32,10 +33,13 @@ else
 fi
 
 echo "[4/5] install services"
-"${SCRIPT_DIR}/install_services.sh"
+DRY_RUN="${DRY_RUN}" "${SCRIPT_DIR}/install_services.sh"
 
 echo "[5/5] post deploy check"
-"${SCRIPT_DIR}/post_deploy_check.sh"
+if [ "${DRY_RUN}" = "true" ]; then
+  echo "[dry-run] skip post deploy check"
+else
+  "${SCRIPT_DIR}/post_deploy_check.sh"
+fi
 
 echo "[full-deploy] completed"
-
