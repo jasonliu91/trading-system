@@ -4,6 +4,17 @@
 
 ---
 
+## D021: 本地运行基线统一为仓库内独立路径
+**日期**: 2026-02-13
+**决策**: 本地与部署启动统一使用 `PYTHONPATH=<repo-root>` + `backend.src.*` 模块路径；`dev_start.sh` 增加 `VENV_DIR` 覆盖并优先使用 `backend/.venv310`；`setup_venv.sh` 强制 Python >= 3.10
+**原因**:
+- 避免 `src.*` 相对路径在不同工作目录下导入失败
+- 修复 Python 3.9 环境下类型语法兼容问题，保证后端稳定启动
+- 当前环境未安装 OpenClaw，运行链路保持与 OpenClaw 迁移解耦
+**关键约束**:
+- 生产与本地命令均以仓库根目录为 `PYTHONPATH`
+- 不引入 OpenClaw 迁移前置步骤，保持系统可独立运行
+
 ## D020: 本地联调采用脚本化三进程管理
 **日期**: 2026-02-12
 **决策**: 提供 `scripts/dev_start.sh`、`scripts/dev_stop.sh`、`scripts/dev_status.sh` 管理 backend/frontend/agent 本地进程

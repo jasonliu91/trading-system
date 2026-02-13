@@ -4,6 +4,13 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 RUN_DIR="${ROOT_DIR}/.run"
 mkdir -p "${RUN_DIR}"
+if [ -n "${VENV_DIR:-}" ]; then
+  BACKEND_VENV="${VENV_DIR}"
+elif [ -x "${ROOT_DIR}/backend/.venv310/bin/python" ]; then
+  BACKEND_VENV="${ROOT_DIR}/backend/.venv310"
+else
+  BACKEND_VENV="${ROOT_DIR}/backend/.venv"
+fi
 
 start_backend() {
   if [ -f "${RUN_DIR}/backend.pid" ] && kill -0 "$(cat "${RUN_DIR}/backend.pid")" >/dev/null 2>&1; then
@@ -11,9 +18,9 @@ start_backend() {
     return
   fi
   (
-    cd "${ROOT_DIR}/backend"
-    source .venv/bin/activate
-    nohup uvicorn src.api.main:app --host 127.0.0.1 --port 8000 >"${RUN_DIR}/backend.log" 2>&1 &
+    cd "${ROOT_DIR}"
+    export PYTHONPATH="${ROOT_DIR}"
+    nohup "${BACKEND_VENV}/bin/uvicorn" backend.src.api.main:app --host 127.0.0.1 --port 8000 >"${RUN_DIR}/backend.log" 2>&1 &
     echo $! > "${RUN_DIR}/backend.pid"
   )
   echo "[backend] started (pid=$(cat "${RUN_DIR}/backend.pid"))"
@@ -54,9 +61,9 @@ start_agent() {
   fi
 
   (
-    cd "${ROOT_DIR}/backend"
-    source .venv/bin/activate
-    nohup python -m src.agent.main >"${RUN_DIR}/agent.log" 2>&1 &
+    cd "${ROOT_DIR}"
+    export PYTHONPATH="${ROOT_DIR}"
+    nohup "${BACKEND_VENV}/bin/python" -m backend.src.agent.main >"${RUN_DIR}/agent.log" 2>&1 &
     echo $! > "${RUN_DIR}/agent.pid"
   )
   echo "[agent] started (pid=$(cat "${RUN_DIR}/agent.pid"))"
@@ -70,4 +77,3 @@ echo "Logs:"
 echo "  ${RUN_DIR}/backend.log"
 echo "  ${RUN_DIR}/frontend.log"
 echo "  ${RUN_DIR}/agent.log"
-

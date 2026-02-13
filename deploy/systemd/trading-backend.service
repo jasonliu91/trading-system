@@ -7,10 +7,10 @@ Type=simple
 User=ubuntu
 WorkingDirectory=/opt/trading-system/backend
 EnvironmentFile=/opt/trading-system/backend/.env
-ExecStart=/opt/trading-system/backend/.venv/bin/uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+Environment=PYTHONPATH=/opt/trading-system
+ExecStart=/opt/trading-system/backend/.venv/bin/uvicorn backend.src.api.main:app --host 127.0.0.1 --port 8000
 Restart=always
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-

@@ -32,14 +32,15 @@ Claude Code → `CLAUDE.md` | OpenAI Codex → `AGENTS.md` | 其他 → 本文�
 ```bash
 # 后端
 cd backend && ./scripts/setup_venv.sh
-source .venv/bin/activate
-uvicorn src.api.main:app --port 8000
+cd ..
+PYTHONPATH=$(pwd) backend/.venv/bin/uvicorn backend.src.api.main:app --port 8000
 
 # 前端
 cd frontend && npm install && npm run dev
 
 # Agent
-cd backend && python -m src.agent.main
+cd ..
+PYTHONPATH=$(pwd) backend/.venv/bin/python -m backend.src.agent.main
 ```
 
 ## 本地三进程脚本
@@ -47,6 +48,7 @@ cd backend && python -m src.agent.main
 ```bash
 ./scripts/dev_start.sh          # 启动 backend + frontend
 START_AGENT=true ./scripts/dev_start.sh
+VENV_DIR=/path/to/backend/.venv310 ./scripts/dev_start.sh
 ./scripts/dev_status.sh
 ./scripts/dev_stop.sh
 ```
