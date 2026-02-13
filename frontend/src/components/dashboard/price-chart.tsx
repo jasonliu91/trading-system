@@ -13,8 +13,16 @@ import {
 } from "lightweight-charts";
 import { useEffect, useMemo, useRef } from "react";
 
+function toUnixSecond(value: string): number | null {
+  const milliseconds = Date.parse(value);
+  if (Number.isNaN(milliseconds)) {
+    return null;
+  }
+  return Math.floor(milliseconds / 1000);
+}
+
 function isoToTime(value: string): Time {
-  return Math.floor(new Date(value).getTime() / 1000) as Time;
+  return (toUnixSecond(value) ?? 0) as Time;
 }
 
 function calculateMovingAverage(source: Kline[], period: number): LineData<Time>[] {
@@ -39,16 +47,26 @@ export function PriceChart({ klines, decisions }: { klines: Kline[]; decisions: 
   const ma20Ref = useRef<ISeriesApi<"Line"> | null>(null);
   const ma50Ref = useRef<ISeriesApi<"Line"> | null>(null);
 
+  const sortedKlines = useMemo(
+    () =>
+      [...klines].sort((a, b) => {
+        const left = toUnixSecond(a.open_time) ?? 0;
+        const right = toUnixSecond(b.open_time) ?? 0;
+        return left - right;
+      }),
+    [klines]
+  );
+
   const candleData = useMemo<CandlestickData<Time>[]>(
     () =>
-      klines.map((row) => ({
+      sortedKlines.map((row) => ({
         time: isoToTime(row.open_time),
         open: row.open,
         high: row.high,
         low: row.low,
         close: row.close
       })),
-    [klines]
+    [sortedKlines]
   );
 
   useEffect(() => {
@@ -99,23 +117,30 @@ export function PriceChart({ klines, decisions }: { klines: Kline[]; decisions: 
       return;
     }
     candleRef.current.setData(candleData);
-    ma20Ref.current.setData(calculateMovingAverage(klines, 20));
-    ma50Ref.current.setData(calculateMovingAverage(klines, 50));
+    ma20Ref.current.setData(calculateMovingAverage(sortedKlines, 20));
+    ma50Ref.current.setData(calculateMovingAverage(sortedKlines, 50));
 
     const markers: SeriesMarker<Time>[] = decisions
       .filter((item) => item.decision !== "hold" && item.entry_price > 0)
-      .map((item) => ({
-        time: isoToTime(item.timestamp),
-        position: item.decision === "sell" ? "aboveBar" : "belowBar",
-        color: item.decision === "sell" ? "#f04438" : "#17b26a",
-        shape: item.decision === "sell" ? "arrowDown" : "arrowUp",
-        text: `${item.decision.toUpperCase()} ${item.position_size_pct.toFixed(1)}%`
-      }));
+      .map((item) => {
+        const markerTime = toUnixSecond(item.timestamp);
+        if (markerTime === null) {
+          return null;
+        }
+        return {
+          time: markerTime as Time,
+          position: item.decision === "sell" ? "aboveBar" : "belowBar",
+          color: item.decision === "sell" ? "#f04438" : "#17b26a",
+          shape: item.decision === "sell" ? "arrowDown" : "arrowUp",
+          text: `${item.decision.toUpperCase()} ${item.position_size_pct.toFixed(1)}%`
+        };
+      })
+      .filter((item): item is SeriesMarker<Time> => item !== null)
+      .sort((a, b) => Number(a.time) - Number(b.time));
     candleRef.current.setMarkers(markers);
 
     chartRef.current?.timeScale().fitContent();
-  }, [candleData, decisions, klines]);
+  }, [candleData, decisions, sortedKlines]);
 
   return <div ref={containerRef} className="h-[420px] w-full rounded-2xl border border-border bg-panel/70" />;
 }
-

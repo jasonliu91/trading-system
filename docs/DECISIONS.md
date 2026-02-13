@@ -4,6 +4,17 @@
 
 ---
 
+## D023: 图表输入统一按时间升序后再送入 Lightweight Charts
+**日期**: 2026-02-13
+**决策**: Dashboard `price-chart` 在渲染前对 `klines` 和 `decision markers` 执行时间升序排序，并过滤无法解析时间的 marker
+**原因**:
+- `lightweight-charts` 对 `setMarkers` 输入要求按时间升序，降序数据会触发运行时断言
+- 决策接口默认按时间倒序返回，直接映射会导致前端报错
+- 手工或异常数据可能存在非法时间字符串，需要前端兜底避免整页崩溃
+**关键约束**:
+- 排序与过滤仅在前端展示层处理，不改变后端 API 返回语义
+- 所有 `setData/setMarkers` 输入保持时间单调不降
+
 ## D022: 前端开发模式加入缓存损坏恢复与弱结构数据防御
 **日期**: 2026-02-13
 **决策**: 当 Next.js 开发模式出现 `.next/server` chunk 缺失（如 `Cannot find module './24.js'`）时，采用“停止服务 -> 清理 `frontend/.next` -> 重启 dev”作为标准恢复步骤；同时 `/mind` 页面对 `strategy_weights/lessons_learned/bias_awareness` 做类型归一化，避免手工编辑后的弱结构数据触发前端崩溃
