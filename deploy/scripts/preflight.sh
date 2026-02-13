@@ -30,8 +30,14 @@ echo "Running preflight checks for ${PROJECT_DIR}"
 
 command -v python3 >/dev/null 2>&1 || fail "python3 is required"
 command -v npm >/dev/null 2>&1 || fail "npm is required"
-command -v systemctl >/dev/null 2>&1 || fail "systemctl is required"
-command -v nginx >/dev/null 2>&1 || fail "nginx is required"
+
+if [ "$(uname -s)" = "Linux" ]; then
+  command -v systemctl >/dev/null 2>&1 || fail "systemctl is required on Linux target"
+  command -v nginx >/dev/null 2>&1 || fail "nginx is required on Linux target"
+else
+  command -v systemctl >/dev/null 2>&1 || warn "systemctl not found (expected on non-Linux dev machine)"
+  command -v nginx >/dev/null 2>&1 || warn "nginx not found (expected on non-Linux dev machine)"
+fi
 
 if grep -q "trade.your-domain.com" "${NGINX_TEMPLATE}"; then
   warn "nginx template still uses placeholder domain trade.your-domain.com"
@@ -62,4 +68,3 @@ if [ ! -f "${FRONTEND_DIR}/package.json" ]; then
 fi
 
 ok "Preflight checks completed"
-
