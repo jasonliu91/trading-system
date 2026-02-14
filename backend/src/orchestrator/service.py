@@ -16,6 +16,7 @@ from backend.src.data.kline_service import fetch_and_store_klines, get_recent_kl
 from backend.src.db.database import SessionLocal
 from backend.src.db.models import Decision
 from backend.src.mind.market_mind import load as load_market_mind
+from backend.src.quant.library import build_quant_snapshot
 from backend.src.risk.engine import apply_risk_checks
 from backend.src.trading.paper_engine import execute_decision, get_portfolio_snapshot
 
@@ -101,8 +102,9 @@ def run_analysis_cycle(db: Session, source: str = "scheduler") -> dict[str, Any]
         logger.warning("数据同步有错误: %s", sync_status["errors"])
 
     # 阶段2: 构建决策上下文
-    daily_klines = get_recent_klines(db=db, symbol=symbol, timeframe="1d", limit=30)
+    daily_klines = get_recent_klines(db=db, symbol=symbol, timeframe="1d", limit=120)
     hourly_klines = get_recent_klines(db=db, symbol=symbol, timeframe="1h", limit=24)
+    quant_snapshot = build_quant_snapshot(symbol=symbol, timeframe="1d", klines=daily_klines)
     market_price = latest_price_from_db(db=db, symbol=symbol) or 0.0
 
     if market_price <= 0:
@@ -127,6 +129,7 @@ def run_analysis_cycle(db: Session, source: str = "scheduler") -> dict[str, Any]
             market_mind=market_mind,
             daily_klines=daily_klines,
             hourly_klines=hourly_klines,
+            quant_signals=quant_snapshot["signals"],
             portfolio=portfolio,
             recent_decisions=recent_decisions,
         )
@@ -195,6 +198,7 @@ def run_analysis_cycle(db: Session, source: str = "scheduler") -> dict[str, Any]
         "symbol": symbol,
         "sync_status": sync_status,
         "market_price": market_price,
+        "quant_snapshot": quant_snapshot,
         "decision_id": decision_row.id,
         "decision": final_decision,
         "risk_result": {

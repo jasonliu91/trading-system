@@ -5,6 +5,7 @@ import {
   MarketMindResponse,
   PerformanceResponse,
   PortfolioSnapshot,
+  SignalsResponse,
   SystemHealthResponse,
   SystemStatusResponse,
   Timeframe
@@ -32,6 +33,10 @@ export async function fetchPortfolio(): Promise<PortfolioSnapshot> {
 export async function fetchDecisions(limit = 20): Promise<DecisionItem[]> {
   const payload = await fetchJSON<{ items: DecisionItem[] }>(`/api/decisions?limit=${limit}`);
   return payload.items ?? [];
+}
+
+export async function fetchSignals(timeframe: Timeframe, limit = 180): Promise<SignalsResponse> {
+  return fetchJSON<SignalsResponse>(`/api/signals?timeframe=${timeframe}&limit=${limit}`);
 }
 
 export async function fetchMarketMind(): Promise<MarketMindResponse> {

@@ -1,6 +1,6 @@
 "use client";
 
-import { DecisionItem, Kline } from "@/lib/types";
+import { DecisionItem, Kline, QuantSignalMarker } from "@/lib/types";
 import {
   CandlestickData,
   ColorType,
@@ -41,7 +41,45 @@ function calculateMovingAverage(source: Kline[], period: number): LineData<Time>
   return output;
 }
 
-export function PriceChart({ klines, decisions }: { klines: Kline[]; decisions: DecisionItem[] }) {
+function strategyColor(strategyName: string, signal: "buy" | "sell"): string {
+  const palette: Record<string, string> = {
+    ema_adx_daily: signal === "buy" ? "#22c55e" : "#ef4444",
+    supertrend_daily: signal === "buy" ? "#06b6d4" : "#f97316",
+    donchian_breakout_daily: signal === "buy" ? "#a3e635" : "#fb7185"
+  };
+  return palette[strategyName] ?? (signal === "buy" ? "#22c55e" : "#ef4444");
+}
+
+function compactStrategyName(name: string): string {
+  if (!name) {
+    return "STRAT";
+  }
+  return name
+    .split(" ")
+    .map((item) => item.charAt(0).toUpperCase())
+    .join("")
+    .slice(0, 5);
+}
+
+interface PriceChartProps {
+  klines: Kline[];
+  decisions: DecisionItem[];
+  quantMarkers: QuantSignalMarker[];
+  showAIDecisions: boolean;
+  showQuantSignals: boolean;
+  minDecisionConfidence: number;
+  activeStrategies: string[];
+}
+
+export function PriceChart({
+  klines,
+  decisions,
+  quantMarkers,
+  showAIDecisions,
+  showQuantSignals,
+  minDecisionConfidence,
+  activeStrategies
+}: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -79,6 +117,69 @@ export function PriceChart({ klines, decisions }: { klines: Kline[]; decisions: 
         color: row.close >= row.open ? "rgba(23, 178, 106, 0.35)" : "rgba(240, 68, 56, 0.35)"
       })),
     [sortedKlines]
+  );
+
+  const aiMarkers = useMemo<SeriesMarker<Time>[]>(() => {
+    if (!showAIDecisions) {
+      return [];
+    }
+
+    return decisions
+      .filter(
+        (item) =>
+          item.decision !== "hold" &&
+          item.entry_price > 0 &&
+          Number(item.confidence) >= minDecisionConfidence
+      )
+      .reduce<SeriesMarker<Time>[]>((output, item) => {
+        const markerTime = toUnixSecond(item.timestamp);
+        if (markerTime === null) {
+          return output;
+        }
+        output.push({
+          time: markerTime as Time,
+          position: item.decision === "sell" ? "aboveBar" : "belowBar",
+          color: item.decision === "sell" ? "#dc2626" : "#16a34a",
+          shape: item.decision === "sell" ? "arrowDown" : "arrowUp",
+          text: `AI ${item.decision.toUpperCase()} ${(item.confidence * 100).toFixed(0)}%`
+        });
+        return output;
+      }, []);
+  }, [decisions, minDecisionConfidence, showAIDecisions]);
+
+  const quantSignalMarkers = useMemo<SeriesMarker<Time>[]>(() => {
+    if (!showQuantSignals) {
+      return [];
+    }
+
+    const selected = new Set(activeStrategies);
+    return quantMarkers
+      .filter((item) => selected.size === 0 || selected.has(item.strategy_name))
+      .reduce<SeriesMarker<Time>[]>((output, item) => {
+        const markerTime = toUnixSecond(item.timestamp);
+        if (markerTime === null) {
+          return output;
+        }
+        output.push({
+          time: markerTime as Time,
+          position: item.signal === "sell" ? "aboveBar" : "belowBar",
+          color: strategyColor(item.strategy_name, item.signal),
+          shape: item.signal === "buy" ? "circle" : "square",
+          text: `Q ${compactStrategyName(item.display_name)} ${item.signal.toUpperCase()}`
+        });
+        return output;
+      }, []);
+  }, [activeStrategies, quantMarkers, showQuantSignals]);
+
+  const markers = useMemo(
+    () =>
+      [...quantSignalMarkers, ...aiMarkers].sort((a, b) => {
+        if (Number(a.time) === Number(b.time)) {
+          return String(a.text ?? "").localeCompare(String(b.text ?? ""));
+        }
+        return Number(a.time) - Number(b.time);
+      }),
+    [aiMarkers, quantSignalMarkers]
   );
 
   useEffect(() => {
@@ -143,28 +244,10 @@ export function PriceChart({ klines, decisions }: { klines: Kline[]; decisions: 
     volumeRef.current.setData(volumeData);
     ma20Ref.current.setData(calculateMovingAverage(sortedKlines, 20));
     ma50Ref.current.setData(calculateMovingAverage(sortedKlines, 50));
-
-    const markers: SeriesMarker<Time>[] = decisions
-      .filter((item) => item.decision !== "hold" && item.entry_price > 0)
-      .map((item) => {
-        const markerTime = toUnixSecond(item.timestamp);
-        if (markerTime === null) {
-          return null;
-        }
-        return {
-          time: markerTime as Time,
-          position: item.decision === "sell" ? "aboveBar" : "belowBar",
-          color: item.decision === "sell" ? "#f04438" : "#17b26a",
-          shape: item.decision === "sell" ? "arrowDown" : "arrowUp",
-          text: `${item.decision.toUpperCase()} ${item.position_size_pct.toFixed(1)}%`
-        };
-      })
-      .filter((item): item is SeriesMarker<Time> => item !== null)
-      .sort((a, b) => Number(a.time) - Number(b.time));
     candleRef.current.setMarkers(markers);
 
     chartRef.current?.timeScale().fitContent();
-  }, [candleData, volumeData, decisions, sortedKlines]);
+  }, [candleData, volumeData, markers, sortedKlines]);
 
   return <div ref={containerRef} className="h-[420px] w-full rounded-2xl border border-border bg-panel/70 md:h-[480px]" />;
 }

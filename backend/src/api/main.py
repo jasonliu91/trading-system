@@ -30,6 +30,7 @@ from backend.src.mind.market_mind import (
     validate_market_mind,
 )
 from backend.src.orchestrator.service import run_analysis_cycle, scheduler_status, start_scheduler, stop_scheduler
+from backend.src.quant.library import build_quant_signal_markers, build_quant_snapshot, get_quant_strategy_catalog
 from backend.src.trading.paper_engine import get_portfolio_snapshot
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
@@ -313,13 +314,28 @@ def get_performance(db: Session = Depends(get_db)) -> dict[str, Any]:
 
 
 @app.get("/api/signals")
-def get_signals() -> dict[str, Any]:
+def get_signals(
+    timeframe: str = Query(default="1d"),
+    limit: int = Query(default=120, ge=30, le=500),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    if timeframe not in {"1h", "4h", "1d"}:
+        raise HTTPException(status_code=400, detail="timeframe must be one of: 1h, 4h, 1d")
+
+    klines = get_recent_klines(db=db, symbol=settings.trading_pair, timeframe=timeframe, limit=limit)
+    source = "database"
+    if not klines:
+        klines = fallback_mock_klines(timeframe=timeframe, limit=limit, symbol=settings.trading_pair)
+        source = "mock_fallback"
+
+    snapshot = build_quant_snapshot(symbol=settings.trading_pair, timeframe=timeframe, klines=klines)
+    markers = build_quant_signal_markers(symbol=settings.trading_pair, timeframe=timeframe, klines=klines, max_points=300)
     return {
-        "items": [
-            {"strategy_name": "ema_adx_daily", "signal": "pending_phase2", "strength": 0.0},
-            {"strategy_name": "supertrend_daily", "signal": "pending_phase2", "strength": 0.0},
-            {"strategy_name": "donchian_daily", "signal": "pending_phase2", "strength": 0.0},
-        ]
+        "items": snapshot["signals"],
+        "summary": snapshot["summary"],
+        "markers": markers,
+        "strategies": get_quant_strategy_catalog(),
+        "source": source,
     }
 
 

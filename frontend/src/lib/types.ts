@@ -37,6 +37,60 @@ export interface DecisionItem {
   input_hash?: string;
 }
 
+export interface QuantSignalItem {
+  strategy_name: string;
+  display_name: string;
+  category: string;
+  symbol: string;
+  timeframe: Timeframe;
+  timestamp: string | null;
+  signal: "buy" | "sell" | "hold";
+  strength: number;
+  indicators: Record<string, number>;
+  reasoning: string;
+}
+
+export interface QuantSignalSummary {
+  recommended_action: "buy" | "sell" | "hold";
+  composite_score: number;
+  confidence: number;
+  signal_count: number;
+  active_signal_count: number;
+  bullish_count: number;
+  bearish_count: number;
+  hold_count: number;
+}
+
+export interface QuantSignalMarker {
+  strategy_name: string;
+  display_name: string;
+  category: string;
+  symbol: string;
+  timeframe: Timeframe;
+  timestamp: string;
+  signal: "buy" | "sell";
+  strength: number;
+  reasoning: string;
+}
+
+export interface QuantStrategyDefinition {
+  strategy_name: string;
+  display_name: string;
+  category: string;
+  description: string;
+  parameters: Record<string, number>;
+  logic_summary: string[];
+  pine_script: string;
+}
+
+export interface SignalsResponse {
+  items: QuantSignalItem[];
+  summary: QuantSignalSummary;
+  markers: QuantSignalMarker[];
+  strategies: QuantStrategyDefinition[];
+  source: string;
+}
+
 export interface PortfolioPosition {
   symbol: string;
   side: "long";

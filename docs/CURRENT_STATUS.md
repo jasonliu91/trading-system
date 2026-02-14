@@ -59,6 +59,9 @@
 - [x] 前端改进: K线图添加成交量柱（绿涨红跌）（2026-02-13）
 - [x] 前端改进: Dashboard/Performance 骨架屏加载 + 错误重试按钮（2026-02-13）
 - [x] 前端改进: Performance 页面移动端网格响应式修复（2026-02-13）
+- [x] 本地回归验证: 从远程同步后完成 `compileall + frontend build + 三进程联调`；修复 `price-chart` 中 marker 类型收窄导致的 build 失败（2026-02-13）
+- [x] 量化交易库: 新增三策略量化信号库（EMA+ADX / Supertrend / Donchian）+ 聚合评分，并接入 `/api/signals` 与决策引擎（2026-02-13）
+- [x] 交易可视化升级: Dashboard新增策略脚本说明面板（Pine风格代码展示）+ K线叠加量化历史信号与AI决策筛选标记；决策引擎增加 `agent_filter` 认知过滤层（2026-02-13）
 
 ## 待开始
 
