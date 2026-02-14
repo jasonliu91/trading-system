@@ -13,6 +13,8 @@ from backend.src.quant.library import STRATEGY_WEIGHTS, summarize_quant_signals
 
 @dataclass
 class DecisionContext:
+    """AI决策所需的完整上下文，包含市场数据、持仓和认知状态。"""
+
     market_mind: dict[str, Any]
     daily_klines: list[dict[str, Any]]
     hourly_klines: list[dict[str, Any]]
@@ -22,6 +24,7 @@ class DecisionContext:
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
+    """安全地将任意值转换为浮点数，转换失败时返回默认值。"""
     try:
         return float(value)
     except (TypeError, ValueError):
@@ -29,6 +32,7 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 
 
 def _close_series(klines: list[dict[str, Any]]) -> list[float]:
+    """从K线数据中提取收盘价序列，过滤无效值。"""
     closes: list[float] = []
     for row in klines:
         close = _safe_float(row.get("close"))
@@ -38,6 +42,7 @@ def _close_series(klines: list[dict[str, Any]]) -> list[float]:
 
 
 def _mean(values: list[float]) -> float:
+    """计算数值列表的算术平均值。"""
     return sum(values) / len(values) if values else 0.0
 
 
@@ -56,6 +61,7 @@ def _fallback_trend_decision(daily_closes: list[float]) -> tuple[str, float, flo
 
 
 def build_prompt(context: DecisionContext) -> str:
+    """根据决策上下文构建LLM提示词，注入Market Mind认知状态和市场数据。"""
     mind_prompt = inject_to_prompt(context.market_mind)
     payload = {
         "daily_klines": context.daily_klines[-30:],
@@ -78,6 +84,7 @@ def build_prompt(context: DecisionContext) -> str:
 
 
 def _infer_bias_check(market_mind: dict[str, Any]) -> str:
+    """从Market Mind的偏误警觉列表推断当前偏误检查文本。"""
     items = market_mind.get("bias_awareness", [])
     if not items:
         return "未配置偏误警觉项，默认执行保守仓位规则。"
@@ -88,6 +95,7 @@ def _infer_bias_check(market_mind: dict[str, Any]) -> str:
 
 
 def _infer_mind_alignment(market_mind: dict[str, Any], signal: str) -> str:
+    """判断当前交易信号与Market Mind认知状态的一致性。"""
     regime = market_mind.get("market_beliefs", {}).get("regime", "")
     if signal == "buy":
         return f"当前信号偏多，与Market Mind的市场阶段判断({regime or '未定义'})一致。"
@@ -211,6 +219,13 @@ def _apply_agent_filter(
 
 
 def generate_decision(context: DecisionContext) -> dict[str, Any]:
+    """
+    根据市场数据和认知状态生成交易决策。
+
+    当前为Phase 1确定性策略（7/21日线均线交叉），后续将替换为真实LLM调用。
+    返回包含 decision/position_size_pct/entry_price/stop_loss/take_profit/
+    confidence/reasoning 等字段的完整决策字典。
+    """
     daily_closes = _close_series(context.daily_klines)
     hourly_closes = _close_series(context.hourly_klines)
     latest_price = hourly_closes[-1] if hourly_closes else (daily_closes[-1] if daily_closes else 0.0)

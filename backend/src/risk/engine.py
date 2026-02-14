@@ -9,6 +9,8 @@ from backend.src.config import settings
 
 @dataclass
 class RiskCheckResult:
+    """风控检查结果，包含审批状态、调整后的决策和违规/调整记录。"""
+
     approved: bool
     adjusted_decision: dict[str, Any]
     violations: list[str] = field(default_factory=list)
@@ -16,6 +18,12 @@ class RiskCheckResult:
 
 
 def _extract_dynamic_position_cap(market_mind: dict[str, Any]) -> float | None:
+    """
+    从Market Mind的偏误缓解措施中提取动态仓位上限。
+
+    解析bias_awareness中包含"仓位"和"上限"的mitigation文本，
+    提取百分比数值作为动态仓位限制。
+    """
     # Example mitigation text:
     # "连续盈利3次后仓位上限自动降低到15%"
     for item in market_mind.get("bias_awareness", []):
@@ -37,6 +45,18 @@ def apply_risk_checks(
     portfolio: dict[str, Any],
     market_mind: dict[str, Any],
 ) -> RiskCheckResult:
+    """
+    对AI决策执行风控检查，包括硬性规则和动态规则。
+
+    检查项目:
+    - 单笔仓位上限 (max_position_pct)
+    - 总敞口上限 (max_exposure_pct)
+    - 止损距离限制 (max_stop_loss_pct)
+    - 日亏损限额 (max_daily_loss_pct)
+    - Market Mind动态仓位限制
+
+    对于超限但不违规的情况，自动调整仓位大小而非直接拒绝。
+    """
     adjusted = dict(decision)
     violations: list[str] = []
     adjustments: list[str] = []

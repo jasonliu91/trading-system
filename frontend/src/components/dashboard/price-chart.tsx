@@ -5,6 +5,7 @@ import {
   CandlestickData,
   ColorType,
   createChart,
+  HistogramData,
   IChartApi,
   ISeriesApi,
   LineData,
@@ -82,6 +83,7 @@ export function PriceChart({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const ma20Ref = useRef<ISeriesApi<"Line"> | null>(null);
   const ma50Ref = useRef<ISeriesApi<"Line"> | null>(null);
 
@@ -103,6 +105,16 @@ export function PriceChart({
         high: row.high,
         low: row.low,
         close: row.close
+      })),
+    [sortedKlines]
+  );
+
+  const volumeData = useMemo<HistogramData<Time>[]>(
+    () =>
+      sortedKlines.map((row) => ({
+        time: isoToTime(row.open_time),
+        value: row.volume,
+        color: row.close >= row.open ? "rgba(23, 178, 106, 0.35)" : "rgba(240, 68, 56, 0.35)"
       })),
     [sortedKlines]
   );
@@ -201,6 +213,16 @@ export function PriceChart({
     });
     candleRef.current = candleSeries;
 
+    // Volume histogram on a separate price scale
+    const volumeSeries = chart.addHistogramSeries({
+      priceFormat: { type: "volume" },
+      priceScaleId: "volume"
+    });
+    chart.priceScale("volume").applyOptions({
+      scaleMargins: { top: 0.8, bottom: 0 }
+    });
+    volumeRef.current = volumeSeries;
+
     ma20Ref.current = chart.addLineSeries({ color: "#0ea5e9", lineWidth: 2, priceLineVisible: false });
     ma50Ref.current = chart.addLineSeries({ color: "#fbbf24", lineWidth: 2, priceLineVisible: false });
 
@@ -208,22 +230,24 @@ export function PriceChart({
       chart.remove();
       chartRef.current = null;
       candleRef.current = null;
+      volumeRef.current = null;
       ma20Ref.current = null;
       ma50Ref.current = null;
     };
   }, []);
 
   useEffect(() => {
-    if (!candleRef.current || !ma20Ref.current || !ma50Ref.current) {
+    if (!candleRef.current || !ma20Ref.current || !ma50Ref.current || !volumeRef.current) {
       return;
     }
     candleRef.current.setData(candleData);
+    volumeRef.current.setData(volumeData);
     ma20Ref.current.setData(calculateMovingAverage(sortedKlines, 20));
     ma50Ref.current.setData(calculateMovingAverage(sortedKlines, 50));
     candleRef.current.setMarkers(markers);
 
     chartRef.current?.timeScale().fitContent();
-  }, [candleData, markers, sortedKlines]);
+  }, [candleData, volumeData, markers, sortedKlines]);
 
-  return <div ref={containerRef} className="h-[480px] w-full rounded-2xl border border-border bg-panel/70" />;
+  return <div ref={containerRef} className="h-[420px] w-full rounded-2xl border border-border bg-panel/70 md:h-[480px]" />;
 }

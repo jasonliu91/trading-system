@@ -21,12 +21,13 @@ from backend.src.data.kline_service import (
 )
 from backend.src.db.database import SessionLocal, get_db
 from backend.src.db.init_db import init_db
-from backend.src.db.models import Decision, MarketMindHistory, Trade
+from backend.src.db.models import Decision, Kline, MarketMindHistory, Trade
 from backend.src.mind.market_mind import (
     inject_to_prompt,
     load as load_market_mind,
     save as save_market_mind,
     update as update_market_mind,
+    validate_market_mind,
 )
 from backend.src.orchestrator.service import run_analysis_cycle, scheduler_status, start_scheduler, stop_scheduler
 from backend.src.quant.library import build_quant_signal_markers, build_quant_snapshot, get_quant_strategy_catalog
@@ -110,8 +111,40 @@ def on_shutdown() -> None:
 
 
 @app.get("/api/system/health")
-def health_check() -> dict[str, Any]:
-    return {"status": "ok", "service": settings.app_name, "scheduler": scheduler_status()}
+def health_check(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """详细健康检查，验证数据库连接、数据新鲜度和调度器状态。"""
+    checks: dict[str, Any] = {}
+
+    # 数据库连接检查
+    try:
+        db.execute(select(Decision).limit(1))
+        checks["database"] = "ok"
+    except Exception as exc:
+        checks["database"] = f"error: {exc}"
+
+    # 数据新鲜度检查
+    latest_kline = db.execute(
+        select(Kline).where(Kline.symbol == settings.trading_pair).order_by(Kline.open_time.desc()).limit(1)
+    ).scalars().first()
+    if latest_kline and latest_kline.open_time:
+        age_hours = (datetime.now(timezone.utc) - latest_kline.open_time).total_seconds() / 3600
+        checks["data_freshness"] = {
+            "latest_kline_age_hours": round(age_hours, 1),
+            "stale": age_hours > 6,
+        }
+    else:
+        checks["data_freshness"] = {"latest_kline_age_hours": None, "stale": True}
+
+    sched = scheduler_status()
+    overall = "ok" if checks["database"] == "ok" and sched.get("status") != "error" else "degraded"
+
+    return {
+        "status": overall,
+        "service": settings.app_name,
+        "version": settings.app_version,
+        "scheduler": sched,
+        "checks": checks,
+    }
 
 
 @app.get("/api/klines")
@@ -187,33 +220,95 @@ def get_trades(
 
 @app.get("/api/performance")
 def get_performance(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """计算真实的绩效指标，包括权益曲线、最大回撤、胜率和盈亏比。"""
     mark_price = latest_price_from_db(db=db, symbol=settings.trading_pair) or 0.0
     portfolio = get_portfolio_snapshot(db=db, symbol=settings.trading_pair, mark_price=mark_price)
-    sells = db.execute(select(Trade).where(Trade.symbol == settings.trading_pair, Trade.side == "sell")).scalars().all()
-    win_count = sum(1 for row in sells if float(row.pnl or 0.0) > 0)
+
+    # 获取所有交易记录，按时间排序
+    all_trades = db.execute(
+        select(Trade).where(Trade.symbol == settings.trading_pair).order_by(Trade.timestamp.asc())
+    ).scalars().all()
+
+    # 构建真实权益曲线（基于每笔交易后的权益变化）
+    equity_curve: list[dict[str, Any]] = []
+    running_equity = settings.initial_balance
+    seen_dates: set[str] = set()
+
+    # 起始点
+    if all_trades and all_trades[0].timestamp:
+        start_date = (all_trades[0].timestamp.date() - timedelta(days=1)).isoformat()
+    else:
+        start_date = (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
+    equity_curve.append({"date": start_date, "equity": round(settings.initial_balance, 2)})
+    seen_dates.add(start_date)
+
+    for trade in all_trades:
+        pnl = float(trade.pnl or 0.0)
+        fee = float(trade.fee or 0.0)
+        if trade.side == "sell":
+            running_equity += pnl
+        else:
+            running_equity -= fee
+
+        if trade.timestamp:
+            date_key = trade.timestamp.date().isoformat()
+            if date_key not in seen_dates:
+                equity_curve.append({"date": date_key, "equity": round(running_equity, 2)})
+                seen_dates.add(date_key)
+            else:
+                # 更新当天最后一个值
+                for point in reversed(equity_curve):
+                    if point["date"] == date_key:
+                        point["equity"] = round(running_equity, 2)
+                        break
+
+    # 添加当前权益
+    today_key = datetime.now(timezone.utc).date().isoformat()
+    current_equity = float(portfolio["equity"])
+    if today_key not in seen_dates:
+        equity_curve.append({"date": today_key, "equity": round(current_equity, 2)})
+    else:
+        for point in reversed(equity_curve):
+            if point["date"] == today_key:
+                point["equity"] = round(current_equity, 2)
+                break
+
+    # 计算最大回撤
+    max_drawdown_pct = 0.0
+    peak_equity = settings.initial_balance
+    for point in equity_curve:
+        eq = point["equity"]
+        if eq > peak_equity:
+            peak_equity = eq
+        if peak_equity > 0:
+            drawdown = (peak_equity - eq) / peak_equity * 100
+            max_drawdown_pct = max(max_drawdown_pct, drawdown)
+
+    # 计算胜率和盈亏比
+    sells = [t for t in all_trades if t.side == "sell"]
+    win_count = sum(1 for t in sells if float(t.pnl or 0.0) > 0)
     win_rate = (win_count / len(sells)) if sells else 0.0
 
+    total_profit = sum(float(t.pnl) for t in sells if float(t.pnl or 0.0) > 0)
+    total_loss = abs(sum(float(t.pnl) for t in sells if float(t.pnl or 0.0) < 0))
+    profit_factor = (total_profit / total_loss) if total_loss > 0 else (float("inf") if total_profit > 0 else 0.0)
+
     total_return_pct = (
-        (float(portfolio["equity"]) - settings.initial_balance) / settings.initial_balance * 100
+        (current_equity - settings.initial_balance) / settings.initial_balance * 100
         if settings.initial_balance > 0
         else 0.0
     )
-
-    equity_curve = [
-        {
-            "date": (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat(),
-            "equity": round(settings.initial_balance, 2),
-        },
-        {"date": datetime.now(timezone.utc).date().isoformat(), "equity": round(float(portfolio["equity"]), 2)},
-    ]
 
     return {
         "equity_curve": equity_curve,
         "metrics": {
             "total_return_pct": round(total_return_pct, 2),
-            "max_drawdown_pct": 0.0,
+            "max_drawdown_pct": round(max_drawdown_pct, 2),
             "win_rate": round(win_rate, 4),
-            "profit_factor": 0.0,
+            "profit_factor": round(profit_factor, 2) if profit_factor != float("inf") else "Inf",
+            "total_trades": len(sells),
+            "winning_trades": win_count,
+            "losing_trades": len(sells) - win_count,
         },
     }
 
@@ -255,14 +350,19 @@ def get_market_mind() -> dict[str, Any]:
 
 @app.put("/api/mind")
 def put_market_mind(payload: MindUpdateRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
+    """更新Market Mind，支持完整替换和增量合并两种模式。"""
     if payload.market_mind is not None:
+        warnings = validate_market_mind(payload.market_mind)
         saved = save_market_mind(
             market_mind=payload.market_mind,
             changed_by=payload.changed_by,
             db=db,
             change_summary=payload.change_summary,
         )
-        return {"market_mind": saved, "mode": "replace"}
+        result: dict[str, Any] = {"market_mind": saved, "mode": "replace"}
+        if warnings:
+            result["validation_warnings"] = warnings
+        return result
     if payload.patch is not None:
         saved = update_market_mind(
             patch=payload.patch,
